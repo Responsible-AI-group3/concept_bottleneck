@@ -5,13 +5,13 @@ experiment_name: "bird_classification"  # Name of the experiment for logging pur
 dataset:
   name: "CUB"  # Name of the dataset (currently supports "CUB" for Caltech-UCSD Birds)
   path: "data/CUB_200_2011"  # Path to the dataset directory
-  batch_size: 32  # Number of samples per batch for training and testing
+  batch_size: 64  # Number of samples per batch for training and testing
   majority_voting: True  # Whether to use majority voting for concept labels
   concept_threshold: 10
 
 training:
-  num_epochs: 2  # Number of training epochs
-  learning_rate: 0.01  # Initial learning rate for optimization
+  num_epochs: 15  # Number of training epochs
+  learning_rate: 0.005  # Initial learning rate for optimization
   momentum: 0.9  # Momentum factor for SGD optimizer
   weight_decay: 0.0001  # Weight decay (L2 penalty) for optimization
   lambda1: 0.1  # Weighting factor for concept loss in joint training
@@ -20,8 +20,8 @@ models:
   concept_model: "inception"  # Type of model for concept prediction (e.g., "inception", "resnet")
   num_concepts: 312  # Number of concepts to predict
   end_model_layers: [312, 200]  # Layer sizes for the end model (from concepts to classes)
-  pretrained: false  # Whether to use pretrained weights for the concept model
+  pretrained: True  # Whether to use pretrained weights for the concept model
 
-modes: ["standard", "independent", "joint"]  # List of training modes to iterate over
+modes: ["standard", "independent", "joint", "sequential"]  # List of training modes to iterate over
 
 device: "auto"  # Device to use for training ("auto" for automatic detection, "cuda" for GPU, "cpu" for CPU)

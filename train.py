@@ -48,6 +48,8 @@ def train(
         concept_optimizer = optim.SGD(concept_model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
         end_optimizer = optim.SGD(end_model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
     elif mode == 'sequential':
+
+
         optimizer = optim.SGD(end_model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
     
     c_losses, y_losses = [], []
@@ -66,34 +68,45 @@ def train(
                 concept_optimizer.zero_grad()
                 end_optimizer.zero_grad()
             
-            c_pred = concept_model(X)
-            y_pred = end_model(c_pred)
+
             
             if mode == 'standard':
+                c_pred = concept_model(X)
+                y_pred = end_model(c_pred)
+
                 loss = criterion(y_pred, y)
                 loss.backward()
                 optimizer.step()
                 y_loss_sum += loss.item()
+
             elif mode == 'independent':
+                                
+                c_pred = concept_model(X)
                 c_loss = criterion(c_pred, c)
                 c_loss.backward()
                 concept_optimizer.step()
                 
+                y_pred = end_model(c)
                 y_loss = criterion(y_pred, y)
                 y_loss.backward()
                 end_optimizer.step()
                 
                 c_loss_sum += c_loss.item()
                 y_loss_sum += y_loss.item()
+
             elif mode == 'joint':
+                c_pred = concept_model(X)
+                y_pred = end_model(c_pred)
                 c_loss = criterion(c_pred, c)
                 y_loss = criterion(y_pred, y)
+
                 loss = y_loss + lambda1 * c_loss
                 loss.backward()
                 optimizer.step()
                 
                 c_loss_sum += c_loss.item()
                 y_loss_sum += y_loss.item()
+
             elif mode == 'sequential':
                 loss = criterion(y_pred, y)
                 loss.backward()
@@ -121,3 +134,4 @@ def save_models(concept_model, end_model, mode):
     """
     torch.save(concept_model.state_dict(), os.path.join("models", f"concept_model_{mode}.pth"))
     torch.save(end_model.state_dict(), os.path.join("models", f"end_model_{mode}.pth"))
+

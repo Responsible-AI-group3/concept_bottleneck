@@ -17,7 +17,7 @@ This project implements a custom dataset class for the CUB-200-2011 dataset, foc
 
  Create a virtual environment:
    ```
-   python3.12 -m venv env
+   python -m venv env
    ```
 
 Activate the virtual environment:
