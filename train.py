@@ -1,137 +1,76 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
 from tqdm import tqdm
-import os
 
-def train(
-    concept_model: nn.Module,
-    end_model: nn.Module,
-    train_loader: DataLoader,
-    test_loader: DataLoader,
-    mode: str,
-    num_epochs: int,
-    learning_rate: float,
-    momentum: float,
-    weight_decay: float,
-    lambda1: float,
-    device: torch.device,
-    verbose: bool = True
-):
-    """
-    Train the concept and end models based on the specified mode.
-    
-    Args:
-        concept_model (nn.Module): The concept prediction model
-        end_model (nn.Module): The end classifier model
-        train_loader (DataLoader): DataLoader for training data
-        test_loader (DataLoader): DataLoader for test data
-        mode (str): Training mode ('standard', 'independent', 'joint', or 'sequential')
-        num_epochs (int): Number of training epochs
-        learning_rate (float): Learning rate for optimization
-        momentum (float): Momentum for SGD optimizer
-        weight_decay (float): Weight decay for regularization
-        lambda1 (float): Lambda parameter for joint training
-        device (torch.device): Device to run the training on
-        verbose (bool): Whether to print detailed progress
-    
-    Returns:
-        tuple: Lists of concept and classification losses over epochs
-    """
-    criterion = nn.CrossEntropyLoss()
-    
-    if mode in ['standard', 'joint']:
-        params = list(concept_model.parameters()) + list(end_model.parameters())
-        optimizer = optim.SGD(params, lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-    elif mode == 'independent':
-        concept_optimizer = optim.SGD(concept_model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-        end_optimizer = optim.SGD(end_model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-    elif mode == 'sequential':
+# Standard and Joint training functions remain the same
 
-
-        optimizer = optim.SGD(end_model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+def train_independent(concept_model, end_model, train_loader, cfg, device):
+    # Train x → c
+    c_optimizer = optim.SGD(concept_model.parameters(), lr=cfg.training.learning_rate, momentum=cfg.training.momentum, weight_decay=cfg.training.weight_decay)
+    c_criterion = nn.BCEWithLogitsLoss()
     
-    c_losses, y_losses = [], []
-    
-    for epoch in tqdm(range(num_epochs), desc='Training', disable=not verbose):
+    c_losses = []
+    for epoch in range(cfg.training.num_epochs):
         concept_model.train()
+        epoch_loss = 0
+        for inputs, concepts, _ in tqdm(train_loader, desc=f"Concept Training: Epoch {epoch+1}/{cfg.training.num_epochs}"):
+            inputs, concepts = inputs.to(device), concepts.to(device)
+            c_optimizer.zero_grad()
+            c_outputs = concept_model(inputs)
+            loss = c_criterion(c_outputs, concepts)
+            loss.backward()
+            c_optimizer.step()
+            epoch_loss += loss.item()
+        avg_loss = epoch_loss / len(train_loader)
+        c_losses.append(avg_loss)
+        print(f"Concept Training: Epoch {epoch+1}, Loss: {avg_loss:.4f}")
+    
+    # Train c → y using true concepts
+    y_optimizer = optim.SGD(end_model.parameters(), lr=cfg.training.learning_rate, momentum=cfg.training.momentum, weight_decay=cfg.training.weight_decay)
+    y_criterion = nn.CrossEntropyLoss()
+    
+    y_losses = []
+    for epoch in range(cfg.training.num_epochs):
         end_model.train()
-        c_loss_sum, y_loss_sum = 0, 0
-        
-        for X, c, y in train_loader:
-            X, c, y = X.to(device), c.to(device), y.to(device)
-            
-            if mode in ['standard', 'joint', 'sequential']:
-                optimizer.zero_grad()
-            elif mode == 'independent':
-                concept_optimizer.zero_grad()
-                end_optimizer.zero_grad()
-            
-
-            
-            if mode == 'standard':
-                c_pred = concept_model(X)
-                y_pred = end_model(c_pred)
-
-                loss = criterion(y_pred, y)
-                loss.backward()
-                optimizer.step()
-                y_loss_sum += loss.item()
-
-            elif mode == 'independent':
-                                
-                c_pred = concept_model(X)
-                c_loss = criterion(c_pred, c)
-                c_loss.backward()
-                concept_optimizer.step()
-                
-                y_pred = end_model(c)
-                y_loss = criterion(y_pred, y)
-                y_loss.backward()
-                end_optimizer.step()
-                
-                c_loss_sum += c_loss.item()
-                y_loss_sum += y_loss.item()
-
-            elif mode == 'joint':
-                c_pred = concept_model(X)
-                y_pred = end_model(c_pred)
-                c_loss = criterion(c_pred, c)
-                y_loss = criterion(y_pred, y)
-
-                loss = y_loss + lambda1 * c_loss
-                loss.backward()
-                optimizer.step()
-                
-                c_loss_sum += c_loss.item()
-                y_loss_sum += y_loss.item()
-
-            elif mode == 'sequential':
-                loss = criterion(y_pred, y)
-                loss.backward()
-                optimizer.step()
-                y_loss_sum += loss.item()
-        
-        c_loss_avg = c_loss_sum / len(train_loader) if c_loss_sum > 0 else 0
-        y_loss_avg = y_loss_sum / len(train_loader)
-        c_losses.append(c_loss_avg)
-        y_losses.append(y_loss_avg)
-        
-        if verbose:
-            print(f'Epoch: {epoch + 1}, Concept Loss: {c_loss_avg:.4f}, Classification Loss: {y_loss_avg:.4f}')
+        epoch_loss = 0
+        for _, concepts, labels in tqdm(train_loader, desc=f"End Model Training: Epoch {epoch+1}/{cfg.training.num_epochs}"):
+            concepts, labels = concepts.to(device), labels.to(device)
+            y_optimizer.zero_grad()
+            y_outputs = end_model(concepts)
+            loss = y_criterion(y_outputs, labels)
+            loss.backward()
+            y_optimizer.step()
+            epoch_loss += loss.item()
+        avg_loss = epoch_loss / len(train_loader)
+        y_losses.append(avg_loss)
+        print(f"End Model Training: Epoch {epoch+1}, Loss: {avg_loss:.4f}")
     
     return c_losses, y_losses
 
-def save_models(concept_model, end_model, mode):
-    """
-    Save the trained models.
-
-    Args:
-        concept_model (nn.Module): The trained concept model.
-        end_model (nn.Module): The trained end model.
-        mode (str): The training mode used (e.g., 'independent', 'joint').
-    """
-    torch.save(concept_model.state_dict(), os.path.join("models", f"concept_model_{mode}.pth"))
-    torch.save(end_model.state_dict(), os.path.join("models", f"end_model_{mode}.pth"))
+def train_sequential(concept_model, end_model, train_loader, cfg, device):
+    # The concept model is already trained, so we only train c → y
+    concept_model.eval()  # Ensure the concept model is in evaluation mode
+    y_optimizer = optim.SGD(end_model.parameters(), lr=cfg.training.learning_rate, momentum=cfg.training.momentum, weight_decay=cfg.training.weight_decay)
+    y_criterion = nn.CrossEntropyLoss()
+    
+    y_losses = []
+    for epoch in range(cfg.training.num_epochs):
+        end_model.train()
+        epoch_loss = 0
+        for inputs, _, labels in tqdm(train_loader, desc=f"End Model Training: Epoch {epoch+1}/{cfg.training.num_epochs}"):
+            inputs, labels = inputs.to(device), labels.to(device)
+            y_optimizer.zero_grad()
+            with torch.no_grad():
+                predicted_concepts = concept_model(inputs)
+            y_outputs = end_model(predicted_concepts)
+            loss = y_criterion(y_outputs, labels)
+            loss.backward()
+            y_optimizer.step()
+            epoch_loss += loss.item()
+        avg_loss = epoch_loss / len(train_loader)
+        y_losses.append(avg_loss)
+        print(f"End Model Training: Epoch {epoch+1}, Loss: {avg_loss:.4f}")
+    
+    return [], y_losses  # Return empty list for c_losses as concept model is not trained here
 

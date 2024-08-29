@@ -6,27 +6,23 @@ import torch
 import numpy as np
 import pandas as pd
 
+
+
 class CUB(Dataset):
-    def __init__(self, data_dir=Path('data/CUB_200_2011'), transform=None, train=True, majority_voting=False, concept_threshold=0):
-        """
-        Initialize the Caltech US Bird dataset.
-        
-        Args:
-            data_dir (Path): Path to the CUB_200_2011 dataset.
-            transform (callable): Transformations to apply to the images.
-            train (bool): Whether to use the training set (True) or test set (False).
-            majority_voting (bool): Whether to apply majority voting to concepts.
-            concept_threshold (float): Threshold for filtering concepts.
-        """
+    def __init__(self, data_dir=Path('data/CUB_200_2011'), train=True, majority_voting=False, concept_threshold=0):
         super(CUB, self).__init__()
 
         self.data_dir = data_dir
-        self.transform = transform or transforms.Compose([
-            transforms.Resize((299, 299)),
+        self.train = train
+
+        # Hardcode the transformation
+        self.transform = transforms.Compose([
+            transforms.RandomResizedCrop(299) if train else transforms.Resize((299, 299)),
+            transforms.RandomHorizontalFlip() if train else transforms.Lambda(lambda x: x),
+            transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1) if train else transforms.Lambda(lambda x: x),
             transforms.ConvertImageDtype(torch.float32),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
-        self.train = train
 
         # Load the dataset files
         self.images = np.loadtxt(data_dir / 'images.txt', dtype=str)
