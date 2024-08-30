@@ -3,7 +3,7 @@
 ### –- specify queue --
 #BSUB -q gpuv100
 ### -- set the job Name --
-#BSUB -J Concept_bottleneck
+#BSUB -J ConceptBottleneck
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 4 
 ### -- Select the resources: 1 gpu in exclusive process mode --
@@ -22,8 +22,8 @@
 #BSUB -N
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
-#BSUB -o gpu_%J.out
-#BSUB -e gpu_%J.err
+#BSUB -o HPC/systemoutput/gpu_%J.out
+#BSUB -e HPC/systemoutput/gpu_%J.err
 # -- end of LSF options --
 
 nvidia-smi
@@ -34,4 +34,4 @@ module load cuda/11.6
 
 source env/bin/activate
 
-python3 main.py  --config-name test > hcp/systemoutput.out
+python3 main.py  --config-name Koh_CUB_replication.yaml

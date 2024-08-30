@@ -106,3 +106,7 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+
+#HPC output
+*.out
+*.err

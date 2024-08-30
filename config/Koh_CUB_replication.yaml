@@ -10,11 +10,14 @@ dataset:
   concept_threshold: 10
 
 training:
-  num_epochs: 15  # Number of training epochs
-  learning_rate: 0.005  # Initial learning rate for optimization
+  num_epochs: 30  # Number of training epochs
+  learning_rate: 0.01  # Initial learning rate for optimization
   momentum: 0.9  # Momentum factor for SGD optimizer
   weight_decay: 0.0001  # Weight decay (L2 penalty) for optimization
   lambda1: 0.1  # Weighting factor for concept loss in joint training
+  lr_scheduler:
+    step_size: 30  # Number of epochs between learning rate decays
+    gamma: 0.1  # Multiplicative factor of learning rate decay
 
 models:
   concept_model: "inception"  # Type of model for concept prediction (e.g., "inception", "resnet")
