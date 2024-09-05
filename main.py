@@ -41,16 +41,6 @@ def main(args: DictConfig):
     print(f"Using device: {device}")
     args.device = device
 
-
-    #train_loader, val_loader = get_dataloaders(args)
-    
-    """
-    output_dir = Path(HydraConfig.get().run.dir)
-    models_dir = output_dir / "models"
-    plots_dir = output_dir / "plots"
-    models_dir.mkdir(exist_ok=True)
-    plots_dir.mkdir(exist_ok=True)
-    """
     experiment = args.mode
     
 
@@ -73,6 +63,7 @@ def main(args: DictConfig):
         train_Chat_to_y_and_test_on_Chat(args)
 
     elif experiment == 'Joint':
+        args.use_attr = True
         train_X_to_C_to_y(args)
 
     elif experiment == 'Standard':

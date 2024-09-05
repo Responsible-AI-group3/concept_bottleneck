@@ -81,8 +81,12 @@ def run_epoch(model, optimizer, loader, loss_meter, acc_meter, criterion, attr_c
                 out_start = 1
             if attr_criterion is not None and args.attr_loss_weight > 0: #X -> A, cotraining, end2end
                 for i in range(len(attr_criterion)):
-                    losses.append(args.attr_loss_weight * (1.0 * attr_criterion[i](outputs[i+out_start].squeeze().type(torch.cuda.FloatTensor), attr_labels_var[:, i]) \
-                                                            + 0.4 * attr_criterion[i](aux_outputs[i+out_start].squeeze().type(torch.cuda.FloatTensor), attr_labels_var[:, i])))
+                    if device.type == 'cpu':
+                        losses.append(args.attr_loss_weight * (1.0 * attr_criterion[i](outputs[i+out_start].squeeze().type(torch.FloatTensor), attr_labels_var[:, i]) \
+                                                            + 0.4 * attr_criterion[i](aux_outputs[i+out_start].squeeze().type(torch.FloatTensor), attr_labels_var[:, i])))
+                    else:
+                        losses.append(args.attr_loss_weight * (1.0 * attr_criterion[i](outputs[i+out_start].squeeze().type(torch.cuda.FloatTensor), attr_labels_var[:, i]) \
+                                                                + 0.4 * attr_criterion[i](aux_outputs[i+out_start].squeeze().type(torch.cuda.FloatTensor), attr_labels_var[:, i])))
         else: #testing or no aux logits
             outputs = model(inputs_var)
             losses = []
@@ -93,7 +97,10 @@ def run_epoch(model, optimizer, loader, loss_meter, acc_meter, criterion, attr_c
                 out_start = 1
             if attr_criterion is not None and args.attr_loss_weight > 0: #X -> A, cotraining, end2end
                 for i in range(len(attr_criterion)):
-                    losses.append(args.attr_loss_weight * attr_criterion[i](outputs[i+out_start].squeeze().type(torch.cuda.FloatTensor), attr_labels_var[:, i]))
+                    if device.type == 'cpu':
+                        losses.append(args.attr_loss_weight * attr_criterion[i](outputs[i+out_start].squeeze().type(torch.FloatTensor), attr_labels_var[:, i]))
+                    else:
+                        losses.append(args.attr_loss_weight * attr_criterion[i](outputs[i+out_start].squeeze().type(torch.cuda.FloatTensor), attr_labels_var[:, i]))
 
         if args.bottleneck: #attribute accuracy
             sigmoid_outputs = torch.nn.Sigmoid()(torch.cat(outputs, dim=1))
@@ -140,7 +147,8 @@ def train(model, args):
 
     device = torch.device(args.device)
 
-    logger = Logger(os.path.join(args.log_dir, 'log.txt'))
+    logger = Logger(os.path.join(args.log_dir, 'log.txt')) # log file for the main task
+    train_logger = Logger(os.path.join(args.log_dir, 'train_log.txt')) # log file for plotting
     logger.write(str(args) + '\n')
     logger.write(str(imbalance) + '\n')
     logger.flush()
@@ -220,12 +228,12 @@ def train(model, args):
         train_loss_avg = train_loss_meter.avg
         val_loss_avg = val_loss_meter.avg
         
-        logger.write('Epoch [%d]:\tTrain loss: %.4f\tTrain accuracy: %.4f\t'
+        train_logger.write('Epoch [%d]:\tTrain loss: %.4f\tTrain accuracy: %.4f\t'
                 'Val loss: %.4f\tVal acc: %.4f\t'
                 'Best val epoch: %d\n'
                 % (epoch, train_loss_avg, train_acc_meter.avg, val_loss_avg, val_acc_meter.avg, best_val_epoch)) 
-        logger.flush()
-        
+        train_logger.flush()
+  
         if epoch <= stop_epoch:
             scheduler.step(epoch) #scheduler step to update lr at the end of epoch     
         #inspect lr
