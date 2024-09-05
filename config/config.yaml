@@ -9,7 +9,7 @@ seed: 1 # Random seed
 #dataset
 image_dir: data/CUB_200_2011/images # test image folder to run inference on'
 data_dir: data/CUB_processed/filtered  # Path to the dataset directory with anotoated pickle files note that the data directory should contain the following files: 'train.pkl', 'val.pkl', 'test.pkl' not the images
-n_attributes: None # Number of attributes in the dataset, if None find them automatically by loading the dataset
+n_attributes: False # Number of attributes in the dataset, if false find them automatically by loading the dataset
 n_classes: 200  # Number of classes in the dataset
 resampling: False  # Whether to use resampling
 
@@ -47,3 +47,7 @@ expand_dim: 0  # Dimension of hidden layer for increased model capacity (for bot
 log_dir: None  # Directory to save logs and model checkpoints
 mode: "Standard"  #"Standard", "Independent", "Joint", "Sequential"]  # List of training modes to iterate over
 device: "auto"  # Device to use for training ("auto" for automatic detection, "cuda" for GPU, "cpu" for CPU)
+
+#Concept model 
+use_relu: False #use relu activation in the end of the concpet classifyer.
+use_sigmoid: True #use sigmoid relu activation in the end of the concpet classifyer.

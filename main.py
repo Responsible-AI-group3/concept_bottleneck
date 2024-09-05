@@ -53,7 +53,8 @@ def main(args: DictConfig):
     """
     experiment = args.mode
     
-    if args.n_attributes == None: # if the data is dynamic, we need to load the data to get the dimensions
+
+    if not isinstance(args.n_attributes, (int, float)): # if the data is dynamic, we need to load the data to get the dimensions
         data = pickle.load(open(os.path.join(args.data_dir,"train.pkl"), 'rb'))
         args.n_attributes = len(data[0]['attribute_label'])
 
