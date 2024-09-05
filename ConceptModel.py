@@ -35,6 +35,8 @@ class ResNetModel(nn.Module):
             torch.Tensor: Predicted concept probabilities.
         """
         x = self.resnet(x)
+        #add sigmoid activation function
+        x = torch.sigmoid(x)
         return torch.sigmoid(x)
 
 class InceptionModel(nn.Module):

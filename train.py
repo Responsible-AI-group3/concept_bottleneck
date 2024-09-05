@@ -1,290 +1,276 @@
+import pdb
+import os
+import sys
+import argparse
+
+import math
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.optim.lr_scheduler import StepLR
-from tqdm import tqdm
+import numpy as np
+from analysis import Logger, AverageMeter, accuracy, binary_accuracy
 
-def train_standard(concept_model, end_model, train_loader, val_loader, cfg, device, verbose=True):
-    combined_model = nn.Sequential(concept_model, end_model)
-    optimizer = optim.SGD(combined_model.parameters(), lr=cfg.learning_rate, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-    scheduler = StepLR(optimizer, step_size=cfg.lr_scheduler.step_size, gamma=cfg.lr_scheduler.gamma)
-    criterion = nn.CrossEntropyLoss()
+from dataset import load_data, find_class_imbalance
+from models import ModelXtoCY, ModelXtoChat_ChatToY, ModelXtoY, ModelXtoC, ModelOracleCtoY, ModelXtoCtoY
 
-    train_losses, val_losses, val_accuracies = [], [], []
+def run_epoch_simple(model, optimizer, loader, loss_meter, acc_meter, criterion, args,device, is_training):
+    """
+    A -> Y: Predicting class labels using only attributes with MLP
+    """
+    if is_training:
+        model.train()
+    else:
+        model.eval()
+    for _, data in enumerate(loader):
+        inputs, labels = data
+        if isinstance(inputs, list):
+            #inputs = [i.long() for i in inputs]
+            inputs = torch.stack(inputs).t().float()
+        inputs = torch.flatten(inputs, start_dim=1).float()
+        inputs_var = torch.autograd.Variable(inputs).to(device)
+        labels_var = torch.autograd.Variable(labels).to(device)
 
-    for epoch in range(cfg.num_epochs):
-        combined_model.train()
-        train_loss = 0.0
-        for inputs, _, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{cfg.num_epochs}", disable=not verbose):
-            inputs, labels = inputs.to(device), labels.to(device)
-            optimizer.zero_grad()
-            outputs = combined_model(inputs)
-            loss = criterion(outputs, labels.argmax(1))  # Use argmax for multi-class
+        
+        outputs = model(inputs_var)
+        loss = criterion(outputs, labels_var)
+        acc = accuracy(outputs, labels, topk=(1,))
+        loss_meter.update(loss.item(), inputs.size(0))
+        acc_meter.update(acc[0], inputs.size(0))
+
+        if is_training:
+            optimizer.zero_grad() #zero the parameter gradients
             loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
+            optimizer.step() #optimizer step to update parameters
+    return loss_meter, acc_meter
 
-        train_loss /= len(train_loader)
-        train_losses.append(train_loss)
+def run_epoch(model, optimizer, loader, loss_meter, acc_meter, criterion, attr_criterion, args,device, is_training):
+    """
+    For the rest of the networks (X -> A, cotraining, simple finetune)
+    """
+    if is_training:
+        model.train()
+    else:
+        model.eval()
 
-        combined_model.eval()
-        val_loss = 0.0
-        correct = 0
-        total = 0
-        with torch.no_grad():
-            for inputs, _, labels in val_loader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                outputs = combined_model(inputs)
-                loss = criterion(outputs, labels.argmax(1))  # Use argmax for multi-class
-                val_loss += loss.item()
-                _, predicted = outputs.max(1)
-                total += labels.size(0)
-                correct += (predicted == labels.argmax(1)).sum().item()
+    for _, data in enumerate(loader):
+        if attr_criterion is None:
+            inputs, labels = data
+            attr_labels, attr_labels_var = None, None
+        else:
+            inputs, labels, attr_labels = data
+            if args.n_attributes > 1:
+                attr_labels = [i.long() for i in attr_labels]
+                attr_labels = torch.stack(attr_labels).t()#.float() #N x 312
+            else:
+                if isinstance(attr_labels, list):
+                    attr_labels = attr_labels[0]
+                attr_labels = attr_labels.unsqueeze(1)
+            attr_labels_var = torch.autograd.Variable(attr_labels).float()
+            attr_labels_var = attr_labels_var.cuda() if torch.cuda.is_available() else attr_labels_var
 
-        val_loss /= len(val_loader)
-        val_accuracy = correct / total
-        val_losses.append(val_loss)
-        val_accuracies.append(val_accuracy)
+        inputs_var = torch.autograd.Variable(inputs)
+        inputs_var = inputs_var.cuda() if torch.cuda.is_available() else inputs_var
+        labels_var = torch.autograd.Variable(labels)
+        labels_var = labels_var.cuda() if torch.cuda.is_available() else labels_var
 
-        scheduler.step()
+        if is_training and args.use_aux:
+            outputs, aux_outputs = model(inputs_var)
+            losses = []
+            out_start = 0
+            if not args.bottleneck: #loss main is for the main task label (always the first output)
+                loss_main = 1.0 * criterion(outputs[0], labels_var) + 0.4 * criterion(aux_outputs[0], labels_var)
+                losses.append(loss_main)
+                out_start = 1
+            if attr_criterion is not None and args.attr_loss_weight > 0: #X -> A, cotraining, end2end
+                for i in range(len(attr_criterion)):
+                    losses.append(args.attr_loss_weight * (1.0 * attr_criterion[i](outputs[i+out_start].squeeze().type(torch.cuda.FloatTensor), attr_labels_var[:, i]) \
+                                                            + 0.4 * attr_criterion[i](aux_outputs[i+out_start].squeeze().type(torch.cuda.FloatTensor), attr_labels_var[:, i])))
+        else: #testing or no aux logits
+            outputs = model(inputs_var)
+            losses = []
+            out_start = 0
+            if not args.bottleneck:
+                loss_main = criterion(outputs[0], labels_var)
+                losses.append(loss_main)
+                out_start = 1
+            if attr_criterion is not None and args.attr_loss_weight > 0: #X -> A, cotraining, end2end
+                for i in range(len(attr_criterion)):
+                    losses.append(args.attr_loss_weight * attr_criterion[i](outputs[i+out_start].squeeze().type(torch.cuda.FloatTensor), attr_labels_var[:, i]))
 
-        if verbose:
-            print(f"Epoch {epoch+1}/{cfg.num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_accuracy:.4f}")
+        if args.bottleneck: #attribute accuracy
+            sigmoid_outputs = torch.nn.Sigmoid()(torch.cat(outputs, dim=1))
+            acc = binary_accuracy(sigmoid_outputs, attr_labels)
+            acc_meter.update(acc.data.cpu().numpy(), inputs.size(0))
+        else:
+            acc = accuracy(outputs[0], labels, topk=(1,)) #only care about class prediction accuracy
+            acc_meter.update(acc[0], inputs.size(0))
 
-        results = {
-        'train_losses': {'class': train_losses},
-        'val_losses': {'class': val_losses},
-        'val_accuracies': {'class': val_accuracies}
-    }
-    return results
-
-def train_independent(concept_model, end_model, train_loader, val_loader, cfg, device, verbose=True):
-    concept_optimizer = optim.SGD(concept_model.parameters(), lr=cfg.learning_rate, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-    end_optimizer = optim.SGD(end_model.parameters(), lr=cfg.learning_rate, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-    concept_scheduler = StepLR(concept_optimizer, step_size=cfg.lr_scheduler.step_size, gamma=cfg.lr_scheduler.gamma)
-    end_scheduler = StepLR(end_optimizer, step_size=cfg.lr_scheduler.step_size, gamma=cfg.lr_scheduler.gamma)
-    concept_criterion = nn.BCEWithLogitsLoss()
-    class_criterion = nn.CrossEntropyLoss()
-
-    train_losses = {'concept': [], 'class': []}
-    val_losses = {'concept': [], 'class': []}
-    val_accuracies = {'concept': [], 'class': []}
-
-    for epoch in range(cfg.num_epochs):
-        concept_model.train()
-        end_model.train()
-        concept_train_loss = 0.0
-        class_train_loss = 0.0
-
-        for inputs, concepts, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{cfg.num_epochs}", disable=not verbose):
-            inputs, concepts, labels = inputs.to(device), concepts.to(device), labels.to(device)
-            
-            # Train concept model
-            concept_optimizer.zero_grad()
-            concept_outputs = concept_model(inputs)
-            concept_loss = concept_criterion(concept_outputs, concepts)
-            concept_loss.backward()
-            concept_optimizer.step()
-            concept_train_loss += concept_loss.item()
-
-            # Train end model
-            end_optimizer.zero_grad()
-            class_outputs = end_model(concepts)
-            class_loss = class_criterion(class_outputs, labels.argmax(1))  # Use argmax for multi-class
-            class_loss.backward()
-            end_optimizer.step()
-            class_train_loss += class_loss.item()
-
-        concept_train_loss /= len(train_loader)
-        class_train_loss /= len(train_loader)
-        train_losses['concept'].append(concept_train_loss)
-        train_losses['class'].append(class_train_loss)
-
-        concept_model.eval()
-        end_model.eval()
-        concept_val_loss = 0.0
-        class_val_loss = 0.0
-        concept_correct = 0
-        class_correct = 0
-        total = 0
-
-        with torch.no_grad():
-            for inputs, concepts, labels in val_loader:
-                inputs, concepts, labels = inputs.to(device), concepts.to(device), labels.to(device)
-                concept_outputs = concept_model(inputs)
-                class_outputs = end_model(concepts)
-
-                concept_loss = concept_criterion(concept_outputs, concepts)
-                class_loss = class_criterion(class_outputs, labels.argmax(1))  # Use argmax for multi-class
-
-                concept_val_loss += concept_loss.item()
-                class_val_loss += class_loss.item()
-
-                concept_correct += ((concept_outputs > 0.5) == concepts).sum().item()
-                _, predicted = class_outputs.max(1)
-                class_correct += (predicted == labels.argmax(1)).sum().item()
-                total += labels.size(0)
-
-        concept_val_loss /= len(val_loader)
-        class_val_loss /= len(val_loader)
-        concept_accuracy = concept_correct / (total * concepts.size(1))
-        class_accuracy = class_correct / total
-
-        val_losses['concept'].append(concept_val_loss)
-        val_losses['class'].append(class_val_loss)
-        val_accuracies['concept'].append(concept_accuracy)
-        val_accuracies['class'].append(class_accuracy)
-
-        concept_scheduler.step()
-        end_scheduler.step()
-
-        if verbose:
-            print(f"Epoch {epoch+1}/{cfg.num_epochs}")
-            print(f"Concept - Train Loss: {concept_train_loss:.4f}, Val Loss: {concept_val_loss:.4f}, Val Acc: {concept_accuracy:.4f}")
-            print(f"Class - Train Loss: {class_train_loss:.4f}, Val Loss: {class_val_loss:.4f}, Val Acc: {class_accuracy:.4f}")
-
-        results = {
-        'train_losses': {'concept': concept_train_loss, 'class': class_train_loss},
-        'val_losses': {'concept': concept_val_loss, 'class': class_val_loss},
-        'val_accuracies': {'concept': class_accuracy, 'class': concept_accuracy}
-    }
-    return results
-
-def train_sequential(concept_model, end_model, train_loader, val_loader, cfg, device, verbose=True):
-    optimizer = optim.SGD(end_model.parameters(), lr=cfg.learning_rate, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-    scheduler = StepLR(optimizer, step_size=cfg.lr_scheduler.step_size, gamma=cfg.lr_scheduler.gamma)
-    criterion = nn.CrossEntropyLoss()
-
-    train_losses, val_losses, val_accuracies = [], [], []
-
-    for epoch in range(cfg.num_epochs):
-        end_model.train()
-        train_loss = 0.0
-
-        for inputs, _, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{cfg.num_epochs}", disable=not verbose):
-            inputs, labels = inputs.to(device), labels.to(device)
+        if attr_criterion is not None:
+            if args.bottleneck:
+                total_loss = sum(losses)/ args.n_attributes
+            else: #cotraining, loss by class prediction and loss by attribute prediction have the same weight
+                total_loss = losses[0] + sum(losses[1:])
+                if args.normalize_loss:
+                    total_loss = total_loss / (1 + args.attr_loss_weight * args.n_attributes)
+        else: #finetune
+            total_loss = sum(losses)
+        loss_meter.update(total_loss.item(), inputs.size(0))
+        if is_training:
             optimizer.zero_grad()
+            total_loss.backward()
+            optimizer.step()
+    return loss_meter, acc_meter
+
+def train(model, args):
+    # Determine imbalance
+    imbalance = None
+    if args.use_attr and not args.no_img and args.weighted_loss:
+        train_data_path = os.path.join(args.data_dir, 'train.pkl')
+        if args.weighted_loss == 'multiple':
+            imbalance = find_class_imbalance(train_data_path, True)
+        else:
+            imbalance = find_class_imbalance(train_data_path, False)
+
+    """
+    #hydra automatically creates the log directory
+    if os.path.exists(args.log_dir): # job restarted by cluster
+        for f in os.listdir(args.log_dir):
+            os.remove(os.path.join(args.log_dir, f))
+    else:
+        os.makedirs(args.log_dir)
+    """
+
+    device = torch.device(args.device)
+
+    logger = Logger(os.path.join(args.log_dir, 'log.txt'))
+    logger.write(str(args) + '\n')
+    logger.write(str(imbalance) + '\n')
+    logger.flush()
+
+    model = model.to(device)
+    criterion = torch.nn.CrossEntropyLoss()
+    if args.use_attr and not args.no_img:
+        attr_criterion = [] #separate criterion (loss function) for each attribute
+        if args.weighted_loss:
+            assert(imbalance is not None)
+            for ratio in imbalance:
+                attr_criterion.append(torch.nn.BCEWithLogitsLoss(weight=torch.FloatTensor([ratio]).cuda()))
+        else:
+            for i in range(args.n_attributes):
+                attr_criterion.append(torch.nn.CrossEntropyLoss())
+    else:
+        attr_criterion = None
+
+    if args.optimizer == 'Adam':
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == 'RMSprop':
+        optimizer = torch.optim.RMSprop(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    else:
+        optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=5, threshold=0.00001, min_lr=0.00001, eps=1e-08)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.scheduler_step, gamma=0.1)
+    stop_epoch = int(math.log(args.min_lr / args.lr) / math.log(args.lr_decay_size)) * args.scheduler_step
+    print("Stop epoch: ", stop_epoch)
+
+    train_data_path = os.path.join(args.data_dir, 'train.pkl')
+    val_data_path = train_data_path.replace('train.pkl', 'val.pkl')
+    logger.write('train data path: %s\n' % train_data_path)
+
+    if args.ckpt: #retraining
+        train_loader = load_data([train_data_path, val_data_path], args.use_attr, args.no_img, args.batch_size, args.uncertain_labels, image_dir=args.image_dir, \
+                                 n_class_attr=args.n_class_attr, resampling=args.resampling)
+        val_loader = None
+    else:
+        train_loader = load_data([train_data_path], args.use_attr, args.no_img, args.batch_size, args.uncertain_labels, image_dir=args.image_dir, \
+                                 n_class_attr=args.n_class_attr, resampling=args.resampling)
+        val_loader = load_data([val_data_path], args.use_attr, args.no_img, args.batch_size, image_dir=args.image_dir, n_class_attr=args.n_class_attr)
+
+    best_val_epoch = -1
+    best_val_loss = float('inf')
+    best_val_acc = 0
+
+    for epoch in range(0, args.epochs):
+        train_loss_meter = AverageMeter()
+        train_acc_meter = AverageMeter()
+        if args.no_img:
+            train_loss_meter, train_acc_meter = run_epoch_simple(model, optimizer, train_loader, train_loss_meter, train_acc_meter, criterion, args,device, is_training=True)
+        else:
+            train_loss_meter, train_acc_meter = run_epoch(model, optimizer, train_loader, train_loss_meter, train_acc_meter, criterion, attr_criterion, args,device, is_training=True)
+ 
+        if not args.ckpt: # evaluate on val set
+            val_loss_meter = AverageMeter()
+            val_acc_meter = AverageMeter()
+        
             with torch.no_grad():
-                concepts = concept_model(inputs)
-            outputs = end_model(concepts)
-            loss = criterion(outputs, labels.argmax(1))  # Use argmax for multi-class
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
+                if args.no_img:
+                    val_loss_meter, val_acc_meter = run_epoch_simple(model, optimizer, val_loader, val_loss_meter, val_acc_meter, criterion, args,device, is_training=False)
+                else:
+                    val_loss_meter, val_acc_meter = run_epoch(model, optimizer, val_loader, val_loss_meter, val_acc_meter, criterion, attr_criterion, args,device, is_training=False)
 
-        train_loss /= len(train_loader)
-        train_losses.append(train_loss)
+        else: #retraining
+            val_loss_meter = train_loss_meter
+            val_acc_meter = train_acc_meter
 
-        end_model.eval()
-        val_loss = 0.0
-        correct = 0
-        total = 0
+        if best_val_acc < val_acc_meter.avg:
+            best_val_epoch = epoch
+            best_val_acc = val_acc_meter.avg
+            logger.write('New model best model at epoch %d\n' % epoch)
+            torch.save(model, os.path.join(args.log_dir, 'best_model_%d.pth' % args.seed))
+            #if best_val_acc >= 100: #in the case of retraining, stop when the model reaches 100% accuracy on both train + val sets
+            #    break
 
-        with torch.no_grad():
-            for inputs, _, labels in val_loader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                concepts = concept_model(inputs)
-                outputs = end_model(concepts)
-                loss = criterion(outputs, labels.argmax(1))  # Use argmax for multi-class
-                val_loss += loss.item()
-                _, predicted = outputs.max(1)
-                total += labels.size(0)
-                correct += (predicted == labels.argmax(1)).sum().item()
+        train_loss_avg = train_loss_meter.avg
+        val_loss_avg = val_loss_meter.avg
+        
+        logger.write('Epoch [%d]:\tTrain loss: %.4f\tTrain accuracy: %.4f\t'
+                'Val loss: %.4f\tVal acc: %.4f\t'
+                'Best val epoch: %d\n'
+                % (epoch, train_loss_avg, train_acc_meter.avg, val_loss_avg, val_acc_meter.avg, best_val_epoch)) 
+        logger.flush()
+        
+        if epoch <= stop_epoch:
+            scheduler.step(epoch) #scheduler step to update lr at the end of epoch     
+        #inspect lr
+        if epoch % 10 == 0:
+            print('Current lr:', scheduler.get_lr())
 
-        val_loss /= len(val_loader)
-        val_accuracy = correct / total
-        val_losses.append(val_loss)
-        val_accuracies.append(val_accuracy)
+        # if epoch % args.save_step == 0:
+        #     torch.save(model, os.path.join(args.log_dir, '%d_model.pth' % epoch))
 
-        scheduler.step()
+        if epoch >= 100 and val_acc_meter.avg < 3:
+            print("Early stopping because of low accuracy")
+            break
+        if epoch - best_val_epoch >= 100:
+            print("Early stopping because acc hasn't improved for a long time")
+            break
 
-        if verbose:
-            print(f"Epoch {epoch+1}/{cfg.num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_accuracy:.4f}")
-            
-    results = {
-        'train_losses': {'class': train_losses},
-        'val_losses': {'class': val_losses},
-        'val_accuracies': {'class': val_accuracies}
-    }
-    return results
+def train_X_to_C(args):
+    """
+    Train concept prediction model used in independent and sequential training
+    """
+    model = ModelXtoC(pretrained=args.pretrained, freeze=args.freeze, num_classes=args.n_classes, use_aux=args.use_aux,
+                      n_attributes=args.n_attributes, expand_dim=args.expand_dim, three_class=args.three_class)
+    train(model, args)
 
-def train_joint(concept_model, end_model, train_loader, val_loader, cfg, device, verbose=True):
-    optimizer = optim.SGD(list(concept_model.parameters()) + list(end_model.parameters()), lr=cfg.learning_rate, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-    scheduler = StepLR(optimizer, step_size=cfg.lr_scheduler.step_size, gamma=cfg.lr_scheduler.gamma)
-    concept_criterion = nn.BCEWithLogitsLoss()
-    class_criterion = nn.CrossEntropyLoss()
+def train_oracle_C_to_y_and_test_on_Chat(args):
+    model = ModelOracleCtoY(n_class_attr=args.n_class_attr, n_attributes=args.n_attributes,
+                            num_classes=args.n_classes, expand_dim=args.expand_dim)
+    train(model, args)
 
-    train_losses = {'concept': [], 'class': []}
-    val_losses = {'concept': [], 'class': []}
-    val_accuracies = {'concept': [], 'class': []}
+def train_Chat_to_y_and_test_on_Chat(args):
+    model = ModelXtoChat_ChatToY(n_class_attr=args.n_class_attr, n_attributes=args.n_attributes,
+                                 num_classes=args.n_classes, expand_dim=args.expand_dim)
+    train(model, args)
 
-    for epoch in range(cfg.num_epochs):
-        concept_model.train()
-        end_model.train()
-        concept_train_loss = 0.0
-        class_train_loss = 0.0
+def train_X_to_C_to_y(args):
+    model = ModelXtoCtoY(n_class_attr=args.n_class_attr, pretrained=args.pretrained, freeze=args.freeze,
+                         num_classes=args.n_classes, use_aux=args.use_aux, n_attributes=args.n_attributes,
+                         expand_dim=args.expand_dim, use_relu=args.use_relu, use_sigmoid=args.use_sigmoid)
+    train(model, args)
 
-        for inputs, concepts, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{cfg.num_epochs}", disable=not verbose):
-            inputs, concepts, labels = inputs.to(device), concepts.to(device), labels.to(device)
-            optimizer.zero_grad()
-            concept_outputs = concept_model(inputs)
-            class_outputs = end_model(concept_outputs)
-            concept_loss = concept_criterion(concept_outputs, concepts)
-            class_loss = class_criterion(class_outputs, labels.argmax(1))  # Use argmax for multi-class
-            loss = class_loss + cfg.lambda1 * concept_loss
-            loss.backward()
-            optimizer.step()
-            concept_train_loss += concept_loss.item()
-            class_train_loss += class_loss.item()
+def train_X_to_y(args):
+    model = ModelXtoY(pretrained=args.pretrained, freeze=args.freeze, num_classes=args.n_classes, use_aux=args.use_aux)
+    train(model, args)
 
-        concept_train_loss /= len(train_loader)
-        class_train_loss /= len(train_loader)
-        train_losses['concept'].append(concept_train_loss)
-        train_losses['class'].append(class_train_loss)
-
-        concept_model.eval()
-        end_model.eval()
-        concept_val_loss = 0.0
-        class_val_loss = 0.0
-        concept_correct = 0
-        class_correct = 0
-        total = 0
-
-        with torch.no_grad():
-            for inputs, concepts, labels in val_loader:
-                inputs, concepts, labels = inputs.to(device), concepts.to(device), labels.to(device)
-                concept_outputs = concept_model(inputs)
-                class_outputs = end_model(concept_outputs)
-                concept_loss = concept_criterion(concept_outputs, concepts)
-                class_loss = class_criterion(class_outputs, labels.argmax(1))  # Use argmax for multi-class
-                concept_val_loss += concept_loss.item()
-                class_val_loss += class_loss.item()
-                concept_correct += ((concept_outputs > 0.5) == concepts).sum().item()
-                _, predicted = class_outputs.max(1)
-                class_correct += (predicted == labels.argmax(1)).sum().item()
-                total += labels.size(0)
-
-        concept_val_loss /= len(val_loader)
-        class_val_loss /= len(val_loader)
-        concept_accuracy = concept_correct / (total * concepts.size(1))
-        class_accuracy = class_correct / total
-
-        val_losses['concept'].append(concept_val_loss)
-        val_losses['class'].append(class_val_loss)
-        val_accuracies['concept'].append(concept_accuracy)
-        val_accuracies['class'].append(class_accuracy)
-
-        scheduler.step()
-
-        if verbose:
-            print(f"Epoch {epoch+1}/{cfg.num_epochs}")
-            print(f"Train - Concept Loss: {concept_train_loss:.4f}, Class Loss: {class_train_loss:.4f}")
-            print(f"Val - Concept Loss: {concept_val_loss:.4f}, Class Loss: {class_val_loss:.4f}")
-            print(f"Val - Concept Acc: {concept_accuracy:.4f}, Class Acc: {class_accuracy:.4f}")
-
-        results = {
-        'train_losses': {'concept': concept_train_loss, 'class': class_train_loss},
-        'val_losses': {'concept': concept_val_loss, 'class': class_val_loss},
-        'val_accuracies': {'concept': class_accuracy, 'class': concept_accuracy}
-    }
-    return results
+def train_X_to_Cy(args):
+    model = ModelXtoCY(pretrained=args.pretrained, freeze=args.freeze, num_classes=args.n_classes, use_aux=args.use_aux,
+                       n_attributes=args.n_attributes, three_class=args.three_class, connect_CY=args.connect_CY)
+    train(model, args)
