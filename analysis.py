@@ -70,16 +70,13 @@ def accuracy(output, target, topk=(1,)):
     output and target are Torch tensors
     """
     
-    # Move to CPU
-    output.to('cpu')
-    target.to('cpu')
-
     maxk = max(topk)
     batch_size = target.size(0)
     _, pred = output.topk(maxk, 1, True, True)
     pred = pred.t()
     temp = target.view(1, -1).expand_as(pred)
-    temp = temp
+    pred = pred.to('cpu')
+
     correct = pred.eq(temp)
 
     res = []

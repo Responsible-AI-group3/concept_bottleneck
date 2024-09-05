@@ -190,10 +190,11 @@ def create_new_dataset(out_dir, field_change, compute_fn, datasets=['train', 'va
 
 
 if __name__ == "__main__":
-    data_dir = r'data\CUB_200_2011'
-    save_dir_unfiltered = r'data\\CUB_processed\\unfiltered'
-    save_dir_filtered = r'data\\CUB_processed\\filtered'
-    split_file = r"data\CUB_processed\train_test_val.pkl"
+    # TODO make this agnostic of operation system. 
+    data_dir = r'data/CUB_200_2011'
+    save_dir_unfiltered = r'data/CUB_processed/unfiltered'
+    save_dir_filtered = r'data/CUB_processed/filtered'
+    split_file = r"data/CUB_processed/train_test_val.pkl"
     train_data, val_data, test_data = extract_data(data_dir,split_file)
 
     #Make dir if not exist

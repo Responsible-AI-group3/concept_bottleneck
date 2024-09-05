@@ -2,10 +2,13 @@
 
 experiment_name: "bird_classification"  # Name of the experiment for logging purposes
 
-#dataset
+#Meta
 name: "CUB"  # Name of the dataset (currently supports "CUB" for Caltech-UCSD Birds)
-image_dir: data\CUB_200_2011\images # test image folder to run inference on'
-data_dir: data\CUB_processed\Filtered  # Path to the dataset directory with anotoated pickle files note that the data directory should contain the following files: 'train.pkl', 'val.pkl', 'test.pkl' not the images
+seed: 1 # Random seed
+
+#dataset
+image_dir: data/CUB_200_2011/images # test image folder to run inference on'
+data_dir: data/CUB_processed/filtered  # Path to the dataset directory with anotoated pickle files note that the data directory should contain the following files: 'train.pkl', 'val.pkl', 'test.pkl' not the images
 n_attributes: None # Number of attributes in the dataset, if None find them automatically by loading the dataset
 n_classes: 200  # Number of classes in the dataset
 resampling: False  # Whether to use resampling
@@ -18,7 +21,7 @@ uncertain_labels : False # Whether to use uncertain labels for attributes
 
 #training
 batch_size: 64
-epochs: 3  # Number of training epochs
+epochs: 500  # Number of training epochs
 save_step: 100 # Number of epochs between model saves
 lr: 0.001  # Initial learning rate for optimization
 optimizer: 'Adam' # Optimizer to use for training (e.g., "Adam", "SGD", "RMSprop")
@@ -42,6 +45,5 @@ expand_dim: 0  # Dimension of hidden layer for increased model capacity (for bot
 
 #output directorys
 log_dir: None  # Directory to save logs and model checkpoints
-
 mode: "Standard"  #"Standard", "Independent", "Joint", "Sequential"]  # List of training modes to iterate over
 device: "auto"  # Device to use for training ("auto" for automatic detection, "cuda" for GPU, "cpu" for CPU)
