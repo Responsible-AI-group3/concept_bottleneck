@@ -1,0 +1,27 @@
+{'experiment_name': 'bird_classification', 'name': 'CUB', 'seed': 1, 'mode': 'Standard', 'device': 'cuda', 'use_attr': False, 'no_img': False, 'image_dir': 'data/CUB_200_2011/images', 'data_dir': 'data/CUB_processed/filtered', 'n_attributes': 112, 'n_classes': 200, 'resampling': False, 'n_class_attr': 2, 'three_class': False, 'uncertain_labels': False, 'batch_size': 64, 'epochs': 2000, 'save_step': 100, 'lr': 0.001, 'optimizer': 'SDG', 'momentum': 0.9, 'weight_decay': 5e-05, 'lambda1': 0.1, 'scheduler_step': 1000, 'min_lr': 0.0001, 'lr_decay_size': 0.1, 'weighted_loss': '', 'attr_loss_weight': 0.1, 'normalize_loss': False, 'concept_model': 'inception', 'pretrained': True, 'ckpt': False, 'freeze': False, 'use_aux': True, 'bottleneck': False, 'expand_dim': 0, 'log_dir': PosixPath('outputs/2024-09-06/16-51-31'), 'use_relu': False, 'use_sigmoid': True}
+None
+train data path: data/CUB_processed/filtered/train.pkl
+New model best model at epoch 0
+New model best model at epoch 1
+New model best model at epoch 2
+New model best model at epoch 3
+New model best model at epoch 4
+New model best model at epoch 5
+New model best model at epoch 6
+New model best model at epoch 7
+New model best model at epoch 8
+New model best model at epoch 9
+New model best model at epoch 11
+New model best model at epoch 12
+New model best model at epoch 13
+New model best model at epoch 15
+New model best model at epoch 18
+New model best model at epoch 19
+New model best model at epoch 20
+New model best model at epoch 24
+New model best model at epoch 25
+New model best model at epoch 34
+New model best model at epoch 37
+New model best model at epoch 59
+New model best model at epoch 63
+New model best model at epoch 119

@@ -127,16 +127,7 @@ def get_class_attributes_data(min_class_count, out_dir, modify_data_dir='', keep
     Function from data_processing_CUB.py in the original implementation, note that the attributes filtered our depends on your train val split
     thus to replicate the function you need to use the original split.
     """
-    """
-    Use train.pkl to aggregate attributes on class level and only keep those that are predominantly 1 for at least min_class_count classes
-    Transform data in modify_data_dir file using the class attribute statistics and save the new dataset to out_dir
-    If keep_instance_data is True, then retain the original values of the selected attributes. Otherwise save aggregated class level attributes
-    In our paper, we set min_class_count to be 10 and only use the following 112 attributes of indices 
-    [1, 4, 6, 7, 10, 14, 15, 20, 21, 23, 25, 29, 30, 35, 36, 38, 40, 44, 45, 50, 51, 53, 54, 56, 57, 59, 63, 64, 69, 70, 72, 75, 80, 84, 90, 91, \
-    93, 99, 101, 106, 110, 111, 116, 117, 119, 125, 126, 131, 132, 134, 145, 149, 151, 152, 153, 157, 158, 163, 164, 168, 172, 178, 179, 181, \
-    183, 187, 188, 193, 194, 196, 198, 202, 203, 208, 209, 211, 212, 213, 218, 220, 221, 225, 235, 236, 238, 239, 240, 242, 243, 244, 249, 253, \
-    254, 259, 260, 262, 268, 274, 277, 283, 289, 292, 293, 294, 298, 299, 304, 305, 308, 309, 310, 311]
-    """
+
     data = pickle.load(open(join(modify_data_dir,'train.pkl'), 'rb'))
     class_attr_count = np.zeros((N_CLASSES, N_ATTRIBUTES, 2))
     for d in data:
@@ -159,6 +150,13 @@ def get_class_attributes_data(min_class_count, out_dir, modify_data_dir='', keep
         collapse_fn = lambda d: list(np.array(d['attribute_label'])[mask])
     else:
         collapse_fn = lambda d: list(class_attr_label_masked[d['class_label'], :])
+        
+        #Save version of the mask so that concept names can be retrieved later
+        f = open(os.path.join(out_dir,'mask.pkl'), 'wb')
+        pickle.dump(mask, f)
+        f.close()
+
+        
     create_new_dataset(out_dir, 'attribute_label', collapse_fn, data_dir=modify_data_dir)
 
 def create_new_dataset(out_dir, field_change, compute_fn, datasets=['train', 'val', 'test'], data_dir=''):
