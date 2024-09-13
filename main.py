@@ -13,7 +13,7 @@ import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 import numpy as np
-from train import train_X_to_C,train_oracle_C_to_y_and_test_on_Chat,train_Chat_to_y_and_test_on_Chat,train_X_to_C_to_y,train_X_to_y,train_X_to_Cy
+from train import train_X_to_C,train_X_to_C_to_y,train_X_to_y,train_C_to_Y
 
 """
 def get_dataloaders(cfg):
@@ -57,10 +57,10 @@ def main(args: DictConfig):
         train_X_to_C(args)
 
     elif experiment == 'Independent':
-        train_oracle_C_to_y_and_test_on_Chat(args)
+        train_X_to_C(args)
 
     elif experiment == 'Sequential':
-        train_Chat_to_y_and_test_on_Chat(args)
+        train_C_to_Y(args)
 
     elif experiment == 'Joint':
         args.use_attr = True
@@ -68,6 +68,9 @@ def main(args: DictConfig):
 
     elif experiment == 'Standard':
         train_X_to_y(args)
+    
+    else:
+        print(f"Invalid experiment type {experiment} provided. Please provide one of the following: Concept, Independent, Sequential, Joint, Standard")
 
 
 if __name__ == "__main__":

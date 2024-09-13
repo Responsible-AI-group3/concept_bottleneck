@@ -450,7 +450,7 @@ class InceptionAux(nn.Module):
 
         if n_attributes > 0:
             if not bottleneck: #cotraining
-                self.all_fc.append(FC(768, num_classes, expand_dim, stddev=0.001))
+                self.all_fc.append(FC(768, num_classes, expand_dim, stddev=0.001)) #Tod Check if this should be num atributes
             for i in range(self.n_attributes):
                 self.all_fc.append(FC(768, 1, expand_dim, stddev=0.001))
         else:

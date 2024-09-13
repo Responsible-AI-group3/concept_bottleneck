@@ -5,10 +5,10 @@ experiment_name: "bird_classification"  # Name of the experiment for logging pur
 #Meta
 name: "CUB"  # Name of the dataset (currently supports "CUB" for Caltech-UCSD Birds)
 seed: 1 # Random seed
-mode: "Sequential"  #"Standard", "Independent", "Joint", "Sequential"]  # List of training modes to iterate over
+mode: Standard  #"Standard", "Independent", "Joint", "Sequential"]  # List of training modes to iterate over
 device: "auto"  # Device to use for training ("auto" for automatic detection, "cuda" for GPU, "cpu" for CPU)
 use_attr: True # Whether to use attributes (for cotraining architecture only)
-no_img: True  # If true, only use attributes (not raw images) for class prediction
+no_img: False  # If true, only use attributes (not raw images) for class prediction
 
 #dataset
 image_dir: data/CUB_200_2011/images # test image folder to run inference on'
@@ -17,10 +17,17 @@ n_attributes: None # Number of attributes in the dataset, if None find them auto
 n_classes: 200  # Number of classes in the dataset
 resampling: False  # Whether to use resampling
 
+
 # using uncertain labels for attributes
 n_class_attr: 2  # Number of classes for attribute prediction. If 2, attributes are binary (e.g., present/absent). If 3, attributes are trinary (e.g., present/absent/uncertain)
-args.three_class:  False # Whether attribute prediction is binary (False)  or trinary (true) classification. Three class classification is used for predicting certain attributes in the CUB dataset
+
+# Apperently this was never implemented
+#three_class:  False # Whether attribute prediction is binary (False)  or trinary (true) classification. Three class classification is used for predicting certain attributes in the CUB dataset
 uncertain_labels : False # Whether to use uncertain labels for attributes
+
+#Removed
+#expand_dim: False  # Whether to expand the dimension of the attribute labels (add extra MLP layer between c -> y)
+
 
 
 #training
@@ -35,7 +42,7 @@ lambda1: 0.1  # Weighting factor for concept loss in joint training
 scheduler_step: 1000  # Number of steps before decaying current learning rate by half
 min_lr: 0.0001  # Minimum learning rate
 lr_decay_size: 0.1  # Learning rate decay factor
-weighted_loss: "" # 'Whether to use weighted loss for single attribute or multiple ones' option is '' or 'multiple'
+weighted_loss: "multiple" # 'Whether to use weighted loss for single attribute or multiple ones' option is '' or 'multiple'
 attr_loss_weight: 0.1 # Lambda for attribute loss in the joint training
 normalize_loss: False # Whether to normalize loss by taking attr_loss_weight into account
 
@@ -46,12 +53,11 @@ ckpt: False  #  if true combine train and val data to train the model
 freeze: false  # Whether to freeze the bottom part of the inception network
 use_aux: True # Whether to use auxiliary logits
 bottleneck: false  # Whether to predict attributes before class labels
-expand_dim: 0  # Dimension of hidden layer for increased model capacity (for bottleneck only)
 
 #output directorys
 log_dir: None  # Directory to save logs and model checkpoints
 
 
-#Concept model 
-use_relu: False #use relu activation in the end of the concpet classifyer.
-use_sigmoid: True #use sigmoid relu activation in the end of the concpet classifyer.
+#Concept model always use sigmoid activation
+#use_relu: False #use relu activation in the end of the concpet classifyer.
+#use_sigmoid: True #use sigmoid relu activation in the end of the concpet classifyer.
