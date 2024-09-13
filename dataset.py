@@ -149,18 +149,21 @@ def load_data(pkl_paths, use_attr, no_img, batch_size, uncertain_label=False, n_
             #transforms.Normalize(mean = [ 0.485, 0.456, 0.406 ], std = [ 0.229, 0.224, 0.225 ]),
             ])
 
-    dataset = CUBDataset(pkl_paths, use_attr, no_img, uncertain_label, image_dir, n_class_attr, transform)
+    #Load dataset
+    dataset = CUBDataset(pkl_paths, use_attr, no_img, uncertain_label, image_dir, n_class_attr, transform) 
     if is_training:
         drop_last = True
         shuffle = True
     else:
         drop_last = False
         shuffle = False
+
+    # Load data note be opps on number of workers
     if resampling:
         sampler = BatchSampler(ImbalancedDatasetSampler(dataset), batch_size=batch_size, drop_last=drop_last)
-        loader = DataLoader(dataset, batch_sampler=sampler)
+        loader = DataLoader(dataset, batch_sampler=sampler,num_workers=4)
     else:
-        loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last,num_workers=4)
     return loader
 
 def find_class_imbalance(pkl_file, multiple_attr=False, attr_idx=-1):

@@ -6,8 +6,9 @@ experiment_name: "bird_classification"  # Name of the experiment for logging pur
 name: "CUB"  # Name of the dataset (currently supports "CUB" for Caltech-UCSD Birds)
 seed: 1 # Random seed
 mode: Standard  #"Standard", "Independent", "Joint", "Sequential"]  # List of training modes to iterate over
+mode: "Standard"  #"Standard", "Independent", "Joint", "Sequential"]  # List of training modes to iterate over
 device: "auto"  # Device to use for training ("auto" for automatic detection, "cuda" for GPU, "cpu" for CPU)
-use_attr: True # Whether to use attributes (for cotraining architecture only)
+use_attr: False # Whether to use attributes (for cotraining architecture only) should be True for Joint training
 no_img: False  # If true, only use attributes (not raw images) for class prediction
 
 #dataset
@@ -32,10 +33,10 @@ uncertain_labels : False # Whether to use uncertain labels for attributes
 
 #training
 batch_size: 64
-epochs: 500  # Number of training epochs
+epochs: 2000  # Number of training epochs
 save_step: 100 # Number of epochs between model saves
 lr: 0.001  # Initial learning rate for optimization
-optimizer: 'Adam' # Optimizer to use for training (e.g., "Adam", "SGD", "RMSprop")
+optimizer: 'SDG' # Optimizer to use for training (e.g., "Adam", "SGD", "RMSprop")
 momentum: 0.9  # Momentum factor for SGD optimizer
 weight_decay: 5e-5  # Weight decay (L2 penalty) for optimization
 lambda1: 0.1  # Weighting factor for concept loss in joint training
@@ -45,6 +46,8 @@ lr_decay_size: 0.1  # Learning rate decay factor
 weighted_loss: "multiple" # 'Whether to use weighted loss for single attribute or multiple ones' option is '' or 'multiple'
 attr_loss_weight: 0.1 # Lambda for attribute loss in the joint training
 normalize_loss: False # Whether to normalize loss by taking attr_loss_weight into account
+
+
 
 #models
 concept_model: "inception"  # Type of model for concept prediction (e.g., "inception", "resnet")
