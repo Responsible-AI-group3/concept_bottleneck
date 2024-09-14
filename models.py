@@ -46,14 +46,17 @@ class ModelXtoC(nn.Module):
                     param.requires_grad = False
 
     def forward(self, x):
-        Chat, aux_Chat = self.model(x)
-        Chat = self.activation(Chat)
 
-        if self.use_aux:
+        if self.use_aux and self.training:
+            Chat, aux_Chat = self.model(x)
+            Chat = self.activation(Chat)
             aux_Chat = self.activation(aux_Chat)
             return Chat, aux_Chat
         
-        return Chat
+        else:
+            Chat = self.model(x)
+            Chat = self.activation(Chat)
+            return Chat
 
 
 class ModelCtoY(nn.Module):
@@ -94,7 +97,7 @@ class ModelXtoCtoY(nn.Module):
             self.aux_MLP_model = ModelCtoY(n_attributes, num_classes)
         
         if freeze:  # only finetune fc layer
-            for name, param in self.CNN_model():
+            for name, param in self.CNN_model.named_parameters():
                 if 'fc' not in name:  # and 'Mixed_7c' not in name:
                     param.requires_grad = False
 
@@ -103,15 +106,18 @@ class ModelXtoCtoY(nn.Module):
         Forward pass of the model
         """
 
-        Chat, aux_Chat = self.CNN_model(x)
-        Chat = self.activation(Chat)
-        Yhat = self.MLP_model(Chat)
+        if self.use_aux and self.training:
+            Chat, aux_Chat = self.CNN_model(x)
+            Chat = self.activation(Chat)
+            Yhat = self.MLP_model(Chat)
 
-        if self.use_aux and self.training: 
             aux_Chat = self.activation(aux_Chat)
             aux_Yhat = self.aux_MLP_model(aux_Chat)
             return Chat, Yhat, aux_Chat, aux_Yhat
         else:
+            Chat = self.CNN_model(x)
+            Chat = self.activation(Chat)
+            Yhat = self.MLP_model(Chat)
             if not self.sailency_output:
                 return Chat, Yhat
 
@@ -140,10 +146,10 @@ class ModelXtoCtoY(nn.Module):
 def ModelXtoY(pretrained, freeze, num_classes, use_aux):
     model = inception_v3(pretrained=pretrained, aux_logits=use_aux) # Load the inception model
 
-    model.fc = nn.Linear(2048, num_classes) # Change the last layer to output the number of attributes
+    model.fc =     nn.Linear(2048, num_classes) # Change the last layer to output the number of attributes
 
     if freeze:  # only finetune fc layer
-        for name, param in model():
+        for name, param in model.named_parameters():
             if 'fc' not in name:  # and 'Mixed_7c' not in name:
                 param.requires_grad = False
     return model

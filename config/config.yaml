@@ -6,7 +6,6 @@ experiment_name: "bird_classification"  # Name of the experiment for logging pur
 name: "CUB"  # Name of the dataset (currently supports "CUB" for Caltech-UCSD Birds)
 seed: 1 # Random seed
 mode: Standard  #"Standard", "Independent", "Joint", "Sequential"]  # List of training modes to iterate over
-mode: "Standard"  #"Standard", "Independent", "Joint", "Sequential"]  # List of training modes to iterate over
 device: "auto"  # Device to use for training ("auto" for automatic detection, "cuda" for GPU, "cpu" for CPU)
 use_attr: False # Whether to use attributes (for cotraining architecture only) should be True for Joint training
 no_img: False  # If true, only use attributes (not raw images) for class prediction

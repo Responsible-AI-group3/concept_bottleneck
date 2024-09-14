@@ -38,7 +38,7 @@ def run_epoch_CtoY(model, optimizer, loader, criterion, args,device, is_training
         loss = criterion(outputs, labels_var)
         acc = accuracy(outputs, labels, topk=(1,))
         loss_meter.update(loss.item(), inputs.size(0))
-        acc_meter.update(acc[0], inputs.size(0))
+        acc_meter.update(acc[0].item(), inputs.size(0))
 
         if is_training:
             optimizer.zero_grad() #zero the parameter gradients
@@ -138,12 +138,16 @@ def run_epoch_XtoY(model, optimizer, loader, criterion, args,device, is_training
             loss = 1.0 * criterion(Yhat, labels_var) + 0.4 * criterion(aux_Yhat, labels_var)
 
         else: #testing or no aux logits
-            outputs = model(inputs_var)
+            Yhat = model(inputs_var)
 
             #Calculate y loss
-            loss = criterion(outputs[0], labels_var)
+            loss = criterion(Yhat, labels_var)
 
         loss_meter.update(loss.item(), inputs.size(0))
+
+        #Calculate class prediction accuracy
+        acc = accuracy(Yhat, labels, topk=(1,)) #only care about class prediction accuracy
+        acc_meter.update(acc[0].item(), inputs.size(0))
 
         if is_training:
             optimizer.zero_grad()
@@ -204,7 +208,7 @@ def run_epoch_XtoCtoY(model, optimizer, loader, y_criterion, c_criterion, args,d
                 losses.append(args.attr_loss_weight * (1.0 * c_criterion[i](Chat[:, i], attr_labels_var[:, i]) + 0.4 * c_criterion[i](aux_Chat[:, i], attr_labels_var[:, i])))
 
         else: #testing or no aux logits
-            Chat,Yhat, aux_Chat,aux_Yhat = model(inputs_var)
+            Chat,Yhat = model(inputs_var)
             losses = []
 
             #Calculate y loss
@@ -274,10 +278,10 @@ def train(model,train_mode, args):
         if args.weighted_loss:
             assert(imbalance is not None)
             for ratio in imbalance:
-                c_criterion.append(torch.nn.BCELoss(weight=torch.FloatTensor([ratio]))) # Note this was originally BCEwithLogitsLoss, but I change the output to sigmoid for consistency over all models.
+                c_criterion.append(torch.nn.BCELoss(weight=torch.FloatTensor([ratio])).to(device)) # Note this was originally BCEwithLogitsLoss, but I change the output to sigmoid for consistency over all models.
         else:
             for i in range(args.n_attributes):
-                c_criterion.append(torch.nn.CrossEntropyLoss())
+                c_criterion.append(torch.nn.CrossEntropyLoss().to(device))
     else:
         c_criterion = None
 
@@ -355,7 +359,10 @@ def train(model,train_mode, args):
 
                 elif train_mode == "X_to_C_to_Y":
                     train_loss_meter,val_c_loss_meter,val_y_loss_meter, val_c_acc_meter,val_y_acc_meter = run_epoch_XtoCtoY(model, optimizer, val_loader,  y_criterion, c_criterion, args,device, is_training=False)
-                    val_acc_meter = val_y_acc_meter # The original paper use the y accuracy meter for evaluation. However, a weighted average of the two accuracies could be used.
+                    
+                    # The original paper use the y accuracy meter for evaluation. However, a weighted average of the two accuracies could be used.
+                    val_acc_meter = val_y_acc_meter 
+                    val_loss_meter=val_y_loss_meter
         
         else: #retraining
             val_loss_meter = train_loss_meter
