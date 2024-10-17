@@ -7,27 +7,25 @@ name: "CUB"  # Name of the dataset (currently supports "CUB" for Caltech-UCSD Bi
 seed: 1 # Random seed
 mode: Standard  #"Standard", "Independent", "Joint", "Sequential"]  # List of training modes to iterate over
 device: "auto"  # Device to use for training ("auto" for automatic detection, "cuda" for GPU, "cpu" for CPU)
-use_attr: False # Whether to use attributes (for cotraining architecture only) should be True for Joint training
-no_img: False  # If true, only use attributes (not raw images) for class prediction
+
 
 #dataset
-image_dir: data/CUB_200_2011/images # test image folder to run inference on'
-data_dir: data/CUB_processed/filtered  # Path to the dataset directory with anotoated pickle files note that the data directory should contain the following files: 'train.pkl', 'val.pkl', 'test.pkl' not the images
-n_attributes: None # Number of attributes in the dataset, if None find them automatically by loading the dataset
-n_classes: 200  # Number of classes in the dataset
+#image_dir: data/CUB_200_2011/images # test image folder to run inference on'
+#data_dir: data/CUB_processed/filtered  # Path to the dataset directory with anotoated pickle files note that the data directory should contain the following files: 'train.pkl', 'val.pkl', 'test.pkl' not the images
 resampling: False  # Whether to use resampling
 
 
-# using uncertain labels for attributes
-n_class_attr: 2  # Number of classes for attribute prediction. If 2, attributes are binary (e.g., present/absent). If 3, attributes are trinary (e.g., present/absent/uncertain)
 
-# Apperently this was never implemented
-#three_class:  False # Whether attribute prediction is binary (False)  or trinary (true) classification. Three class classification is used for predicting certain attributes in the CUB dataset
-uncertain_labels : False # Whether to use uncertain labels for attributes
+CUB_dataloader: # Paremeter for the CUB dataloader
+  CUB_dir: data/CUB_200_2011 # Path to the CUB dataset directory
+  split_file: data\CUB_processed\train_test_val.pkl # Path to the split file
 
-#Removed
-#expand_dim: False  # Whether to expand the dimension of the attribute labels (add extra MLP layer between c -> y)
+  #Concept (attributes) settings
+  return_concepts: False # Whether to return concept labels
+  return_visibility: False # Whether to return visibility labels can not be used with majority voting if return_concepts is True the dataloader will return a tuple of (concept_labels, visibility_labels)
 
+  use_majority_voting: False # Whether to use majority voting for concepts labels
+  min_class_count: 10 # apply the filer that removes concepts present in less than min_class_count classes only relevant after majority voting if false use all 320 concepts
 
 
 #training

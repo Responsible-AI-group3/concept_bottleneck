@@ -278,7 +278,8 @@ def train(model,train_mode, args):
         if args.weighted_loss:
             assert(imbalance is not None)
             for ratio in imbalance:
-                c_criterion.append(torch.nn.BCELoss(weight=torch.FloatTensor([ratio])).to(device)) # Note this was originally BCEwithLogitsLoss, but I change the output to sigmoid for consistency over all models.
+                # Note this was originally BCEwithLogitsLoss, but I change the output to sigmoid for consistency over all models.
+                c_criterion.append(torch.nn.BCELoss(weight=torch.FloatTensor([ratio])).to(device)) 
         else:
             for i in range(args.n_attributes):
                 c_criterion.append(torch.nn.CrossEntropyLoss().to(device))
