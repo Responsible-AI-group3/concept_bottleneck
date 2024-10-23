@@ -105,20 +105,33 @@ def train_X_to_C(args):
                 #Calculate loss
                 if args.use_aux:
                     outputs, aux_outputs = model(X)
-                    losses = []
+                    
+                    main_losses = []
+                    aux_losses = []
 
                     for i in range(len(c_criterion)): # Loop over each concept and give an individual loss for each. 
-                        losses.append(1.0 * c_criterion[i](outputs[:,i], C[:,i]) + 0.4 * c_criterion[i](aux_outputs[:,i], C[:,i]))
+                        main_losses.append(c_criterion[i](outputs[:,i], C[:,i]))
+                        aux_losses.append(c_criterion[i](aux_outputs[:,i], C[:,i]))
+
+                    main_loss = sum(main_losses)
+                    aux_loss = sum(aux_losses)
+
+                    loss = main_loss + 0.4 * aux_loss
+                    trakker.update_loss("train",main_loss)
+
                 else: #testing or no aux logits
                     outputs = model(X)
                     losses = []
 
                     for i in range(len(c_criterion)):
                         losses.append(1.0 * c_criterion[i](outputs[:,i], C[:,i]))
+                        loss = sum(losses)
+
+                    trakker.update_loss("train",loss)
                 
                 #Calculate accuracy
                 trakker.update_concept_accuracy("train",outputs, C)
-                trakker.update_loss("train",sum(losses)/n_concepts)
+                
 
                 #Backward pass
                 optimizer.zero_grad()
@@ -385,7 +398,6 @@ def train_X_to_C_to_y(args):
 
     #Define the optimizer
     optimizer, scheduler = get_optimizer(model, args)
-    stop_epoch = int(math.log(args.min_lr / args.lr) / math.log(args.lr_decay_size)) * args.scheduler_step
 
 
     best_val_loss = float('inf')
@@ -404,20 +416,44 @@ def train_X_to_C_to_y(args):
             Y = Y.to(device)
 
             #Forward pass
-            Chat,Yhat, aux_Chat,aux_Yhat = model(X)
+            if args.use_aux:
+                Chat,Yhat, aux_Chat,aux_Yhat = model(X)
 
-            losses = []
+                main_losses = []
+                aux_losses = []
 
-            #Calculate y loss
-            loss_main = 1.0 * y_criterion(Yhat, Y) + 0.4 * y_criterion(aux_Yhat, Y)
-            losses.append(loss_main)
+                #Calculate y loss
+                main_loss = y_criterion(Yhat, Y)
+                aux_loss = y_criterion(aux_Yhat, Y)
 
-            #Calculate the atribute loss by looping over each prediction. 
-            for i in range(len(c_criterion)):
-                losses.append(args.attr_loss_weight * (1.0 * c_criterion[i](Chat[:, i], C[:, i]) + 0.4 * c_criterion[i](aux_Chat[:, i], C[:, i])))
+                main_losses.append(main_loss)
+                aux_losses.append(aux_loss)
 
-            
-            loss = sum(losses)
+                #Calculate the atribute loss by looping over each prediction, and multiply by lambda 
+                for i in range(len(c_criterion)):
+                    main_losses.append(c_criterion[i](Chat[:, i], C[:, i]) * args.attr_loss_weight)
+                    aux_losses.append(c_criterion[i](aux_Chat[:, i], C[:, i]) *args.attr_loss_weight)
+
+                
+                main_loss = sum(main_losses)
+                aux_loss = sum(aux_loss)
+
+                loss = main_loss + 0.4 * aux_loss
+                trakker.update_loss("train",main_loss) #log main loss
+            else:
+                Chat,Yhat = model(X)
+
+                losses = []
+
+                #Calculate y loss
+                main_loss = y_criterion(Yhat, Y)
+                losses.append(main_loss)
+
+                for i in range(len(c_criterion)):
+                    losses.append(args.attr_loss_weight * c_criterion[i](Chat[:, i], C[:, i]))
+                
+                loss = sum(losses)
+                trakker.update_loss("train",loss)
 
             #Backward pass
             optimizer.zero_grad()
@@ -427,11 +463,7 @@ def train_X_to_C_to_y(args):
             #Calculate accuracy
             trakker.update_class_accuracy("train",Yhat, Y)
             trakker.update_concept_accuracy("train",Chat, C)
-            trakker.update_loss("train",loss)
-
-        
-
-
+            
         #Evaluate the model
         if not args.ckpt:
             model.eval()
@@ -539,7 +571,6 @@ def train_X_to_y(args):
 
     #Define the optimizer
     optimizer, scheduler = get_optimizer(model, args)
-    stop_epoch = int(math.log(args.min_lr / args.lr) / math.log(args.lr_decay_size)) * args.scheduler_step
 
 
     best_val_loss = float('inf')
@@ -561,13 +592,16 @@ def train_X_to_y(args):
                 Yhat, aux_Yhat = model(X)
 
                 #Calculate y loss
-                loss = 1.0 * y_criterion(Yhat, Y) + 0.4 * y_criterion(aux_Yhat, Y)
+                main_loss = y_criterion(Yhat, Y)
+                aux_loss = y_criterion(aux_Yhat, Y)
+                loss = main_loss + 0.4 * aux_loss
+                trakker.update_loss("train",main_loss) #only log the main loss
             else:
-
                 Yhat = model(X)
 
                 #Calculate loss
                 loss = y_criterion(Yhat, Y)
+                trakker.update_loss("train",loss)
 
             #Backward pass
             optimizer.zero_grad()
@@ -576,9 +610,7 @@ def train_X_to_y(args):
 
             #Calculate accuracy
             trakker.update_class_accuracy("train",Yhat, Y)
-            trakker.update_loss("train",loss)
         
-
 
         #Evaluate the model
         if not args.ckpt:
