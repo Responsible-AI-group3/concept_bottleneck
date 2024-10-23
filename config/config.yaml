@@ -18,7 +18,7 @@ resampling: False  # Whether to use resampling
 
 CUB_dataloader: # Paremeter for the CUB dataloader
   CUB_dir: data/CUB_200_2011 # Path to the CUB dataset directory
-  split_file: data\CUB_processed\train_test_val.pkl # Path to the split file
+  split_file: data/CUB_processed/train_test_val.pkl # Path to the split file
 
   #Concept (attributes) settings
   return_concepts: False # Whether to return concept labels
@@ -30,8 +30,7 @@ CUB_dataloader: # Paremeter for the CUB dataloader
 
 #training
 batch_size: 32
-epochs: 2 #2000  # Number of training epochs
-save_step: 100 # Number of epochs between model saves
+epochs: 2000 #2000  # Number of training epochs
 lr: 0.001  # Initial learning rate for optimization
 optimizer: 'Adam' # Optimizer to use for training (e.g., "Adam", "SGD", "RMSprop")
 momentum: 0.9  # Momentum factor for SGD optimizer

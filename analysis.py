@@ -59,7 +59,7 @@ class TrainingLogger:
 
     def update_loss(self, mode: str, loss: float):
         """Update loss for the given mode"""
-        self.loss_data[mode].append(loss.detach().cpu().numpy())
+        self.loss_data[mode].append(loss.item())
 
     def get_class_metrics(self, mode: str) -> Dict[str, float]:
         if self.class_data[mode]['total'] == 0:

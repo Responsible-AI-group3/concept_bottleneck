@@ -427,7 +427,7 @@ def train_X_to_C_to_y(args):
             #Calculate accuracy
             trakker.update_class_accuracy("train",Yhat, Y)
             trakker.update_concept_accuracy("train",Chat, C)
-            trakker.update_loss("train",loss.item())
+            trakker.update_loss("train",loss)
 
         
 
@@ -456,7 +456,7 @@ def train_X_to_C_to_y(args):
                     #Calculate concept prediction accuracy
                     trakker.update_concept_accuracy("val",Chat, C)
                     trakker.update_class_accuracy("val",Yhat, Y)
-                    trakker.update_loss("val",sum(losses).item())
+                    trakker.update_loss("val",sum(losses))
 
             val_loss = trakker.get_loss_metrics("val")['avg_loss']
             val_acc = trakker.get_class_metrics("val")['top1_accuracy'] #Acuracy of class prediction
@@ -585,12 +585,12 @@ def train_X_to_y(args):
             model.eval()
             with torch.no_grad():
                 for _, data in enumerate(val_loader):
-                    C, Y = data
-                    C = C.to(device)
+                    X,_, Y = data
+                    X = X.to(device)
                     Y = Y.to(device)
 
                     #Forward pass
-                    Yhat = model(C)
+                    Yhat = model(X)
 
                     #Calculate loss
                     loss = y_criterion(Yhat, Y)

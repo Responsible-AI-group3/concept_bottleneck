@@ -34,7 +34,7 @@ class CUB_dataset(Dataset):
 
         self.image_dir = os.path.join(config_dict['CUB_dir'],'images') # 
 
-        split = pickle.load(open(config_dict['split_file'], 'rb')) #Load the train test val split
+        split = pickle.load(open(os.path.join(config_dict['split_file']), 'rb')) #Load the train test val split
 
         #Load id of images based on the train mode
         if mode == 'train':

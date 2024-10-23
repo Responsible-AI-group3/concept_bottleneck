@@ -6,7 +6,7 @@ This project implements a custom dataset class for the CUB-200-2011 dataset, foc
 
 ### Prerequisites
 
-- Python 3.12 or 3.11
+- Python 3.12 
 - pip (Python package installer)
 
 
@@ -17,7 +17,7 @@ This project implements a custom dataset class for the CUB-200-2011 dataset, foc
 
  Create a virtual environment:
    ```
-   python3
+   python -m venv env
    ```
 
 Activate the virtual environment:
@@ -30,7 +30,7 @@ Activate the virtual environment:
 
 Create a virtual environment:
    ```
-   python3 -m venv env
+   python -m venv env
    ```
  Activate the virtual environment:
    ```
