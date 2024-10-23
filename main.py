@@ -28,7 +28,7 @@ def get_dataloaders(cfg):
 def get_device(cfg):
     if cfg.device.lower() == "auto":
         return "cuda" if torch.cuda.is_available() else "cpu"
-    return torch.device(cfg.device)
+    return cfg.device
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(args: DictConfig):
@@ -44,10 +44,6 @@ def main(args: DictConfig):
     experiment = args.mode
     
 
-    if not isinstance(args.n_attributes, (int, float)): # if the data is dynamic, we need to load the data to get the dimensions
-        data = pickle.load(open(os.path.join(args.data_dir,"train.pkl"), 'rb'))
-        args.n_attributes = len(data[0]['attribute_label'])
-
 
     print("Configuration for this run:")
     print(OmegaConf.to_yaml(args))
@@ -58,16 +54,23 @@ def main(args: DictConfig):
 
     elif experiment == 'Independent':
         train_X_to_C(args)
-
-    elif experiment == 'Sequential':
         train_C_to_Y(args)
 
+    elif experiment == 'Sequential':
+        XtoC_model=train_X_to_C(args)
+
+        #tain the model on predictions of the previous model
+        train_C_to_Y(args,XtoC_model)
+        
+
     elif experiment == 'Joint':
-        args.use_attr = True
         train_X_to_C_to_y(args)
 
     elif experiment == 'Standard':
         train_X_to_y(args)
+
+    elif experiment == 'end':
+        train_C_to_Y(args)
     
     else:
         print(f"Invalid experiment type {experiment} provided. Please provide one of the following: Concept, Independent, Sequential, Joint, Standard")

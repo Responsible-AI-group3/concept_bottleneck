@@ -22,12 +22,14 @@ class CUB_dataset(Dataset):
     """
 
 
-    def __init__(self, train_mode, config_dict: dict,transform=None): 
+    def __init__(self, mode, config_dict: dict,transform=None): 
         """
-        train_mode: str,
+        mode: str,
         config_dict: dict, dictionary containing all the necessary information for the dataset
         transform: torchvision.transforms, transform to be applied to the image
         """
+        self.N_CLASSES = 200 # Number of classes in the dataset
+        self.N_CONCEPTS = 312
         self.transform = transform
 
         self.image_dir = os.path.join(config_dict['CUB_dir'],'images') # 
@@ -35,16 +37,16 @@ class CUB_dataset(Dataset):
         split = pickle.load(open(config_dict['split_file'], 'rb')) #Load the train test val split
 
         #Load id of images based on the train mode
-        if train_mode == 'train':
+        if mode == 'train':
             self.data_id = split['train']
-        elif train_mode == 'test':
+        elif mode == 'test':
             self.data_id = split['test']
-        elif train_mode == 'val':
+        elif mode == 'val':
             self.data_id = split['val']
-        elif train_mode == 'ckpt':
+        elif mode == 'ckpt':
             self.data_id = split['train'] + split['val']
         else:
-            raise ValueError('train_mode must be either train, test, val or ckpt')
+            raise ValueError('mode must be either train, test, val or ckpt')
         
         # Perform majority voting if the config_dict specifies
         if config_dict['use_majority_voting']:
@@ -57,13 +59,15 @@ class CUB_dataset(Dataset):
 
             self.concepts, self.concept_mask = self.apply_filter(train_ids,config_dict["min_class_count"],concepts,train_labels,visibility) # Apply filter to the class attributes
             self.visibility = None # Visibility is relevant after majority voting
+
+            self.N_CONCEPTS = sum(self.concept_mask) # Update the number of concepts based on the filter
         else:
             self.majority_voting = False
 
             if config_dict['return_visibility']:
                 self.concepts, self.visibility = self.load_concepts(config_dict['CUB_dir'])
             else:
-                self.concepts, _ = self.load_concepts(config_dict['CUB_dir'],self.data_id,visibility=False)
+                self.concepts, _ = self.load_concepts(config_dict['CUB_dir'])
             
                 self.visibility = None
 
@@ -123,7 +127,7 @@ class CUB_dataset(Dataset):
             for line in f:
                 file_id, attribute_idx, attribute_label, attribute_certainty = line.strip().split()[:4]
 
-                concepts[int(file_id)].append(int(attribute_label) - 1) # -1 to make the labels 0 indexed
+                concepts[int(file_id)].append(int(attribute_label)) 
 
                 visibility[int(file_id)].append(uncertainty_map[int(attribute_label)][int(attribute_certainty)])
         
@@ -172,6 +176,37 @@ class CUB_dataset(Dataset):
             mask = np.ones(312, dtype=bool)
         
         return class_max_label[:,mask], mask
+
+    def calculate_imbalance(self):
+        """
+        Calculate class imbalance ratio for all binary concept labels.
+        
+        :return: A list of imbalance ratios, one for each concept.
+        """
+        n_samples = len(self.data_id)
+        n_concepts = len(next(iter(self.concepts.values())))
+        
+        # Initialize a list to count the number of positive labels for each concept
+        positive_count = [0] * n_concepts
+
+        # Count positive labels for each concept across all samples
+        for img_id in self.data_id:
+            for i, label in enumerate(self.concepts[img_id]):
+                positive_count[i] += label
+
+        # Calculate imbalance ratio for each concept
+        imbalance_ratios = []
+        for count in positive_count:
+            if count > 0:
+                # Imbalance ratio = (total samples / positive samples) - 1
+                ratio = (n_samples / count) - 1
+            else:
+                # If no positive samples, set ratio to infinity
+                ratio = float('inf')
+            imbalance_ratios.append(ratio)
+
+        return imbalance_ratios
+
     
     def __len__(self):
         return len(self.data_id)
@@ -185,6 +220,8 @@ class CUB_dataset(Dataset):
 
         if self.transform:
             X = self.transform(X)
+        else:
+            X = transforms.ToTensor()(X)
         
         Y = self.labels[img_id]
 
@@ -197,9 +234,18 @@ class CUB_dataset(Dataset):
             else:
                 C = self.concepts[img_id]
         
+        #Make C a tensor
+        C = torch.tensor(C, dtype=torch.float32)
+        
+        #Make Y one hot encoded
+        Y_one_hot = torch.zeros(self.N_CLASSES, dtype=torch.float32)
+        Y_one_hot[Y] = 1
 
 
-        return X, C, Y
+
+        return X, C, Y_one_hot
+
+    
     
 
 
@@ -209,11 +255,11 @@ class CUB_CtoY_dataset(CUB_dataset):
     It  can take in a pre-trained X to C model to generate the concepts
     """
 
-    def __init__(self, train_mode:str, config_dict: dict,transform=None,  model:str = None,device:str = 'cpu'): 
+    def __init__(self, mode:str, config_dict: dict,transform=None,  model:str = None,device:str = 'cpu'): 
         """
         return_mode: str, 
         """
-        super().__init__(train_mode,config_dict)
+        super().__init__(mode,config_dict)
 
 
     def generate_concept_mask(self,model,device,hard_concept:bool = False):
@@ -253,7 +299,14 @@ class CUB_CtoY_dataset(CUB_dataset):
             else:
                 C = self.concepts[img_id]
 
-        return C, Y 
+        #Make C a tensor
+        C = torch.tensor(C, dtype=torch.float32)
+        
+        #Make Y one hot encoded
+        Y_one_hot = torch.zeros(self.N_CLASSES, dtype=torch.float32)
+        Y_one_hot[Y] = 1
+
+        return C, Y_one_hot 
 
 
 class CUB_extnded_dataset(CUB_dataset):
@@ -261,14 +314,14 @@ class CUB_extnded_dataset(CUB_dataset):
     A cup dataset that would return coordinates on concepts
     """
 
-    def __init__(self,train_mode:str, config_dict: dict,transform=None,crop_size:int =299):
+    def __init__(self,mode:str, config_dict: dict,transform=None,crop_size:int =299):
         """
         config_dict: dict, dictionary containing all the necessary information for the dataset
         transform: torchvision.transforms, transform to be applied to the image
         """
 
         self.crop_size = crop_size
-        super().__init__(train_mode,config_dict,transform)
+        super().__init__(mode,config_dict,transform)
 
                 #Read the file with the names of bird location attributes
         self.part_names = []
@@ -375,6 +428,13 @@ class CUB_extnded_dataset(CUB_dataset):
 
         if self.transform:
             X = self.transform(img)
+
+        #Make C a tensor
+        C = torch.tensor(C, dtype=torch.float32)
+        
+        #Make Y one hot encoded
+        Y_one_hot = torch.zeros(self.N_CLASSES, dtype=torch.float32)
+        Y_one_hot[Y] = 1
 
         return X, C, Y, coordinates
 
