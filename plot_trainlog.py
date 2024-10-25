@@ -1,10 +1,12 @@
 import json
 import matplotlib.pyplot as plt
+import os
 
-def save_training_metrics(log_file_path):
+def save_training_metrics(log_file_path,output_dir=""):
     """
     Read training log JSON and save separate plots with subplots including loss metrics.
     """
+
     # Read JSON file
     with open(log_file_path, 'r') as f:
         data = json.load(f)
@@ -47,7 +49,7 @@ def save_training_metrics(log_file_path):
             ax.grid(True)
         
         plt.tight_layout()
-        plt.savefig('class_train_plot.png')
+        plt.savefig(os.path.join(output_dir,'class_train_plot.png'))
         plt.close()
     
     # Handle concept metrics if they exist
@@ -86,7 +88,7 @@ def save_training_metrics(log_file_path):
             ax.grid(True)
         
         plt.tight_layout()
-        plt.savefig('concept_train_plot.png')
+        plt.savefig(os.path.join(output_dir,'concept_train_plot.png'))
         plt.close()
 
 if __name__ == "__main__":

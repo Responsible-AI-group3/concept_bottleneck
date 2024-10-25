@@ -60,7 +60,7 @@ class CUB_dataset(Dataset):
             self.concepts, self.concept_mask = self.apply_filter(train_ids,config_dict["min_class_count"],concepts,train_labels,visibility) # Apply filter to the class attributes
             self.visibility = None # Visibility is relevant after majority voting
 
-            self.N_CONCEPTS = sum(self.concept_mask) # Update the number of concepts based on the filter
+            self.N_CONCEPTS = len(self.concept_mask) # Update the number of concepts based on the filter
         else:
             self.majority_voting = False
 
