@@ -173,7 +173,7 @@ class CUB_dataset(Dataset):
             class_count = np.sum(class_max_label, axis=0)
             mask = np.where(class_count >= min_class_count)[0] #select attributes that are present (on a class level) in at least [min_class_count] classes
         else:
-            mask = np.ones(312, dtype=bool)
+            mask = np.arange(312)
         
         return class_max_label[:,mask], mask
 
@@ -184,15 +184,27 @@ class CUB_dataset(Dataset):
         :return: A list of imbalance ratios, one for each concept.
         """
         n_samples = len(self.data_id)
-        n_concepts = len(next(iter(self.concepts.values())))
         
         # Initialize a list to count the number of positive labels for each concept
-        positive_count = [0] * n_concepts
+        positive_count = [0] * self.N_CONCEPTS
+        
+        if self.majority_voting:
+            # If majority voting is applied, the number of samples is equal to the number of classes
+            n_samples = self.N_CLASSES
 
-        # Count positive labels for each concept across all samples
-        for img_id in self.data_id:
-            for i, label in enumerate(self.concepts[img_id]):
-                positive_count[i] += label
+            # Count positive labels for each concept across all classes
+            for y in range(self.N_CLASSES):
+                for i, label in enumerate(self.concepts[y]):
+                    positive_count[i] += label
+
+        
+        else:
+            # If majority voting is not applied, the number of samples is equal to the number of images
+            n_samples = len(self.data_id)
+            # Count positive labels for each concept across all samples
+            for img_id in self.data_id:
+                for i, label in enumerate(self.concepts[img_id]):
+                    positive_count[i] += label
 
         # Calculate imbalance ratio for each concept
         imbalance_ratios = []
@@ -448,12 +460,26 @@ if __name__ == "__main__":
     print(len(dataset))
     print(dataset[0])
     dataset = CUB_extnded_dataset('val',config_dict,transform)
+    print(dataset.calculate_imbalance())
     print(len(dataset))
     print(dataset[0])
     dataset = CUB_CtoY_dataset('train',config_dict,transform)
     print(len(dataset))
     print(dataset[0])
+    
 
+    config_dict = {'CUB_dir':r'data/CUB_200_2011','split_file':r'data\CUB_processed\train_test_val.pkl','use_majority_voting':False,'min_class_count':10,'return_visibility':True}
+    transform = transforms.Compose([transforms.Resize((299,299)),transforms.ToTensor()])
+    dataset = CUB_dataset('train',config_dict,transform)
+    print(len(dataset))
+    print(dataset[0])
+    dataset = CUB_extnded_dataset('val',config_dict,transform)
+    print(dataset.calculate_imbalance())
+    print(len(dataset))
+    print(dataset[0])
+    dataset = CUB_CtoY_dataset('train',config_dict,transform)
+    print(len(dataset))
+    print(dataset[0])
 
         
             
