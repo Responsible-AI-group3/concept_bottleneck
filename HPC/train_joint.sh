@@ -34,4 +34,4 @@ module load cuda/11.6
 
 source env/bin/activate
 
-python3 main.py mode=Joint use_attr=True
+python3 main.py mode=Joint

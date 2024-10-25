@@ -135,7 +135,7 @@ def train_X_to_C(args):
 
                 #Backward pass
                 optimizer.zero_grad()
-                sum(losses).backward()
+                loss.backward()
                 optimizer.step()
 
             
@@ -160,7 +160,7 @@ def train_X_to_C(args):
                         
                         #Calculate accuracy
                         trakker.update_concept_accuracy("val",outputs, C)
-                        trakker.update_loss("val",sum(losses)/n_concepts)
+                        trakker.update_loss("val",sum(losses))
 
 
                     #Check if the model is the best model
@@ -219,7 +219,7 @@ def train_C_to_Y(args,XtoC_model=None):
     """
 
     #Define the loggers
-    trakker = TrainingLogger(os.path.join(args.log_dir, 'C_TO_Y_log.json'))
+    trakker = TrainingLogger(os.path.join(args.log_dir, 'CtoY_log.json'))
 
     device = torch.device(args.device)
 
@@ -436,7 +436,7 @@ def train_X_to_C_to_y(args):
 
                 
                 main_loss = sum(main_losses)
-                aux_loss = sum(aux_loss)
+                aux_loss = sum(aux_losses)
 
                 loss = main_loss + 0.4 * aux_loss
                 trakker.update_loss("train",main_loss) #log main loss
@@ -477,6 +477,7 @@ def train_X_to_C_to_y(args):
                     #Forward pass
                     Chat,Yhat = model(X)
 
+                    losses = []
 
                     #Calculate y loss
                     loss_main = y_criterion(Yhat, Y)

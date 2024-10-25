@@ -125,8 +125,8 @@ class TrainingLogger:
             json.dump(self.all_epochs_data, f, indent=2)
         
         # Print formatted metrics to console
-        print(f"\nEpoch {epoch} Training Metrics:")
-        print(self.format_metrics(metrics))
+        #print(f"\nEpoch {epoch} Training Metrics:")
+        #print(self.format_metrics(metrics))
 
     def format_metrics(self, metrics: Dict[str, Dict[str, Any]]) -> str:
         formatted = ""

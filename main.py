@@ -14,6 +14,7 @@ from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 import numpy as np
 from train import train_X_to_C,train_X_to_C_to_y,train_X_to_y,train_C_to_Y
+from plot_trainlog import save_training_metrics
 
 """
 def get_dataloaders(cfg):
@@ -51,26 +52,35 @@ def main(args: DictConfig):
 
     if experiment == 'Concept':
         train_X_to_C(args)
+        save_training_metrics(os.path.join(args.log_dir, 'XtoCtrain_log.json')) #Read file from Json
 
     elif experiment == 'Independent':
         train_X_to_C(args)
         train_C_to_Y(args)
+        save_training_metrics(os.path.join(args.log_dir, 'XtoCtrain_log.json'))
+        save_training_metrics(os.path.join(args.log_dir, 'C_TO_Y_log.json'))
 
     elif experiment == 'Sequential':
         XtoC_model=train_X_to_C(args)
 
         #tain the model on predictions of the previous model
         train_C_to_Y(args,XtoC_model)
+        save_training_metrics(os.path.join(args.log_dir, 'XtoCtrain_log.json'))
+        save_training_metrics(os.path.join(args.log_dir, 'C_TO_Y_log.json'))
         
 
     elif experiment == 'Joint':
         train_X_to_C_to_y(args)
+        save_training_metrics(os.path.join(args.log_dir, 'train_log.json'))
 
     elif experiment == 'Standard':
         train_X_to_y(args)
+        save_training_metrics(os.path.join(args.log_dir, 'train_log.json'))
 
-    elif experiment == 'end':
+    elif experiment == 'End':
+        #Train only a C to Y model, may be used instrad of Independent
         train_C_to_Y(args)
+        save_training_metrics(os.path.join(args.log_dir, 'C_TO_Y_log.json'))
     
     else:
         print(f"Invalid experiment type {experiment} provided. Please provide one of the following: Concept, Independent, Sequential, Joint, Standard")

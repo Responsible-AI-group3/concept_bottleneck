@@ -3,7 +3,7 @@
 ### –- specify queue --
 #BSUB -q gpuv100
 ### -- set the job Name --
-#BSUB -J Concept
+#BSUB -J Sequntial
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 4 
 ### -- Select the resources: 1 gpu in exclusive process mode --
@@ -34,4 +34,4 @@ module load cuda/11.6
 
 source env/bin/activate
 
-python3 main.py mode=Concept use_attr=True bottleneck=True
+python3 main.py mode=Sequential
