@@ -260,5 +260,8 @@ def get_inception_transform(mode="train",methode="original",resol=299):
                 transforms.ToTensor(), #implicitly divides by 255
                 transforms.Normalize(mean = [0.5, 0.5, 0.5], std = [2, 2, 2])
                 ])
+    
+    else:
+        raise ValueError("Invalid methode for transform. Please provide one of the following: original, center, resize")
 
     return transform

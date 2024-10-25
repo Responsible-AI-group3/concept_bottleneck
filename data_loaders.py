@@ -173,7 +173,7 @@ class CUB_dataset(Dataset):
             class_count = np.sum(class_max_label, axis=0)
             mask = np.where(class_count >= min_class_count)[0] #select attributes that are present (on a class level) in at least [min_class_count] classes
         else:
-            mask = np.arange(312)
+            mask = np.arrange(312)
         
         return class_max_label[:,mask], mask
 

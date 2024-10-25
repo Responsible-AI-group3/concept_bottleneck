@@ -47,8 +47,8 @@ def train_X_to_C(args):
 
 
     #define the data loaders
-    train_transform = get_inception_transform(mode="train",methode="original")
-    val_transform = get_inception_transform(mode="val",methode="original")
+    train_transform = get_inception_transform(mode="train",methode=args.transform_method)
+    val_transform = get_inception_transform(mode="val",methode=args.transform_method)
     
     if args.ckpt:
         #train checkpointed model
@@ -358,8 +358,8 @@ def train_X_to_C_to_y(args):
     device = torch.device(args.device)
 
         #define the data loaders
-    train_transform = get_inception_transform(mode="train",methode="original")
-    val_transform = get_inception_transform(mode="val",methode="original")
+    train_transform = get_inception_transform(mode="train",methode=args.transform_method)
+    val_transform = get_inception_transform(mode="val",methode=args.transform_method)
     
     if args.ckpt:
         #train checkpointed model
@@ -539,8 +539,8 @@ def train_X_to_y(args):
     device = torch.device(args.device)
 
     #define the data loaders
-    train_transform = get_inception_transform(mode="train",methode="original")
-    val_transform = get_inception_transform(mode="val",methode="original")
+    train_transform = get_inception_transform(mode="train",methode=args.transform_method)
+    val_transform = get_inception_transform(mode="val",methode=args.transform_method)
     
     if args.ckpt:
         #train checkpointed model

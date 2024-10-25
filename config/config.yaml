@@ -29,6 +29,7 @@ CUB_dataloader: # Paremeter for the CUB dataloader
   min_class_count: 10 # apply the filer that removes concepts present in less than min_class_count classes only relevant after majority voting if false use all 320 concepts
 
 
+
 #training
 batch_size: 32
 epochs: 5 #2000  # Number of training epochs
@@ -43,6 +44,7 @@ lr_decay_size: 0.1  # Learning rate decay factor
 weighted_loss: "multiple" # 'Whether to use weighted loss for single attribute or multiple ones' option is '' or 'multiple'
 attr_loss_weight: 0.1 # Lambda for attribute loss in the joint training
 normalize_loss: False # Whether to normalize loss by taking attr_loss_weight into account
+transform_method: "resize" # Transformation method for the concept bottleneck model ("original","resized","center")
 
 
 
