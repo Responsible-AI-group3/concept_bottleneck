@@ -67,13 +67,6 @@ nvidia-smi
 
 ## Usage
 
-After installation, you can import and use the BirdDataset class in your Python scripts:
 
-```python
-from bird_dataset import BirdDataset
-
-# Create a dataset instance
-dataset = BirdDataset(data_dir='path/to/CUB_200_2011', 
-                      train=True, 
-                      majority_voting=True, 
-                      concept_threshold=0.05)
+## Notable changes from original code.
+  
