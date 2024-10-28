@@ -6,7 +6,7 @@ This project implements a custom dataset class for the CUB-200-2011 dataset, foc
 
 ### Prerequisites
 
-- Python 3.12 
+- Python 3.9 to 3.12 
 - pip (Python package installer)
 
 

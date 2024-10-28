@@ -6,7 +6,7 @@ import argparse
 import math
 import torch
 import numpy as np
-from analysis import Logger, AverageMeter, accuracy, binary_accuracy
+from utils.analysis import Logger, AverageMeter, accuracy, binary_accuracy
 
 from dataset import load_data, find_class_imbalance
 from models import   ModelXtoY, ModelXtoC, ModelXtoCtoY, ModelCtoY

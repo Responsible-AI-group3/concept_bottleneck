@@ -28,8 +28,8 @@ class CUB_dataset(Dataset):
         config_dict: dict, dictionary containing all the necessary information for the dataset
         transform: torchvision.transforms, transform to be applied to the image
         """
-        self.N_CLASSES = 200 # Number of classes in the dataset
-        self.N_CONCEPTS = 312
+        self.n_classes = 200 # Number of classes in the dataset
+        self.n_concepts = 312
         self.transform = transform
 
         self.image_dir = os.path.join(config_dict['CUB_dir'],'images') # 
@@ -58,9 +58,9 @@ class CUB_dataset(Dataset):
             train_labels = self.load_labels(config_dict['CUB_dir']) # Load the class labels
 
             self.concepts, self.concept_mask = self.apply_filter(train_ids,config_dict["min_class_count"],concepts,train_labels,visibility) # Apply filter to the class attributes
-            self.visibility = None # Visibility is relevant after majority voting
+            self.visibility = None # Visibility is not relevant after majority voting
 
-            self.N_CONCEPTS = len(self.concept_mask) # Update the number of concepts based on the filter
+            self.n_concepts = len(self.concept_mask) # Update the number of concepts based on the filter
         else:
             self.majority_voting = False
 
@@ -186,14 +186,14 @@ class CUB_dataset(Dataset):
         n_samples = len(self.data_id)
         
         # Initialize a list to count the number of positive labels for each concept
-        positive_count = [0] * self.N_CONCEPTS
+        positive_count = [0] * self.n_concepts
         
         if self.majority_voting:
             # If majority voting is applied, the number of samples is equal to the number of classes
-            n_samples = self.N_CLASSES
+            n_samples = self.n_concepts
 
             # Count positive labels for each concept across all classes
-            for y in range(self.N_CLASSES):
+            for y in range(self.n_classes):
                 for i, label in enumerate(self.concepts[y]):
                     positive_count[i] += label
 
@@ -250,7 +250,7 @@ class CUB_dataset(Dataset):
         C = torch.tensor(C, dtype=torch.float32)
         
         #Make Y one hot encoded
-        Y_one_hot = torch.zeros(self.N_CLASSES, dtype=torch.float32)
+        Y_one_hot = torch.zeros(self.n_classes, dtype=torch.float32)
         Y_one_hot[Y] = 1
 
 
@@ -315,7 +315,7 @@ class CUB_CtoY_dataset(CUB_dataset):
         C = torch.tensor(C, dtype=torch.float32)
         
         #Make Y one hot encoded
-        Y_one_hot = torch.zeros(self.N_CLASSES, dtype=torch.float32)
+        Y_one_hot = torch.zeros(self.n_classes, dtype=torch.float32)
         Y_one_hot[Y] = 1
 
         return C, Y_one_hot 
@@ -350,13 +350,15 @@ class CUB_extnded_dataset(CUB_dataset):
         #Load concept labels names
         self.consept_labels_names = pd.read_csv(os.path.join(config_dict['CUB_dir'],"atributes.txt"), sep=" ", header=None)[1].values
 
+        #Load class labels names
+        self.class_labels_names = pd.read_csv(os.path.join(config_dict['CUB_dir'],"classes.txt"), sep=" ", header=None)[1].values
 
         #If a filter was applied load the filter names.
         if self.majority_voting:
             self.consept_labels_names= self.consept_labels_names[self.concept_mask]
 
 
-    def get_cordinates(self,id,img,concept_label):
+    def get_cordinates(self,id,img):
         """
         Get coordinates of the concepts
 
@@ -398,8 +400,7 @@ class CUB_extnded_dataset(CUB_dataset):
             
         concept_coordinate = []
 
-        for i in range(len(concept_label)):
-            concept_name = self.consept_labels_names[i]
+        for concept_name in self.consept_labels_names:
             concept_name = concept_name.split("_")[1] #Remove get part related to the concept
 
             #Apparently english has two words for the mouth of a bird and the dataset uses both. 
@@ -428,6 +429,8 @@ class CUB_extnded_dataset(CUB_dataset):
 
         if self.majority_voting:
             C = self.concepts[Y] # If majority voting is applied the concepts are based on the class label
+
+
         else:
             #Make C a tuple if visibility is not None
             if self.visibility is not None:
@@ -436,7 +439,7 @@ class CUB_extnded_dataset(CUB_dataset):
                 C = self.concepts[img_id]
         
         #Get the coordinates before applying the transform
-        coordinates = self.get_cordinates(self.data_id[idx],img,C)
+        coordinates = self.get_cordinates(self.data_id[idx],img)
 
         if self.transform:
             X = self.transform(img)
@@ -445,10 +448,10 @@ class CUB_extnded_dataset(CUB_dataset):
         C = torch.tensor(C, dtype=torch.float32)
         
         #Make Y one hot encoded
-        Y_one_hot = torch.zeros(self.N_CLASSES, dtype=torch.float32)
+        Y_one_hot = torch.zeros(self.n_classes, dtype=torch.float32)
         Y_one_hot[Y] = 1
 
-        return X, C, Y, coordinates
+        return X, C, Y_one_hot, coordinates
 
     
 

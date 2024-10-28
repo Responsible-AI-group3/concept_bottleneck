@@ -14,7 +14,7 @@ from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 import numpy as np
 from train import train_X_to_C,train_X_to_C_to_y,train_X_to_y,train_C_to_Y
-from plot_trainlog import save_training_metrics
+from utils.plot_trainlog import save_training_metrics
 
 """
 def get_dataloaders(cfg):

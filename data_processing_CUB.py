@@ -1,4 +1,6 @@
 """
+Outdate file originally used to make dataset. However the new version rely on making dataloaders on demand and preprocessed data before each experiment. to reduce confusion, this is thus only needed if you want a new train val split.
+
 Modified version of the original code: https://github.com/yewsiang/ConceptBottleneck
 
 Make train, val, test datasets based on train_test_split.txt, and by sampling val_ratio of the official train data to make a validation set 

@@ -12,7 +12,7 @@ import logging
 #from dataset import load_data, find_class_imbalance
 from data_loaders import CUB_dataset,CUB_CtoY_dataset
 from models import   ModelXtoY, ModelXtoC, ModelXtoCtoY, ModelCtoY,get_inception_transform
-from analysis import Logger,TrainingLogger
+from utils.analysis import Logger,TrainingLogger
 
 
 
@@ -63,7 +63,7 @@ def train_X_to_C(args):
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=4)
         val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    n_concepts = train_data.N_CONCEPTS
+    n_concepts = train_data.n_concepts
 
     #Write the number of concepts to the logger
     logging.info(f"Number of concepts: {n_concepts}\n")
@@ -236,16 +236,16 @@ def train_C_to_Y(args,XtoC_model=None):
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=4)
         val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    num_classes = train_data.N_CLASSES
-    num_concepts = train_data.N_CONCEPTS
+    num_classes = train_data.n_classes
+    num_concepts = train_data.n_concepts
 
     #Write the number of classes and concepts to the logger
     logging.info(f"Number of classes: {num_classes}\n")
     logging.info(f"Number of concepts: {num_concepts}\n")
 
     #Define the model
-    model = ModelCtoY(input_dim=train_data.N_CONCEPTS,
-                            num_classes=train_data.N_CLASSES)
+    model = ModelCtoY(input_dim=num_concepts,
+                            num_classes=num_classes)
     model = model.to(device)
 
     
@@ -374,8 +374,8 @@ def train_X_to_C_to_y(args):
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=4)
         val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    n_concepts = train_data.N_CONCEPTS
-    n_classes = train_data.N_CLASSES
+    n_concepts = train_data.n_concepts
+    n_classes = train_data.n_classes
 
     model = ModelXtoCtoY(pretrained=args.pretrained, freeze=args.freeze,
                          n_classes=n_classes, use_aux=args.use_aux, n_concepts=n_concepts)
@@ -555,10 +555,10 @@ def train_X_to_y(args):
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=4)
         val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    n_classes = train_data.N_CLASSES
+    n_classes = train_data.n_classes
 
     #Write the number of classes and concepts to the logger
-    logging.info(f"Number of classes: {train_data.N_CLASSES}\n")
+    logging.info(f"Number of classes: {n_classes}\n")
 
     
     #Define the model
