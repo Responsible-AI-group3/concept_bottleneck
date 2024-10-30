@@ -1,0 +1,32 @@
+
+mode: Sequential #"Standard", "Independent", "Joint", "Sequential","end"  # List of training modes to iterate over
+
+model_path: "models/CUB/Sequential/2021-07-06_14-00-00"  # Path to the model directory
+output_dir: None  # Directory to save evaluation results if blank will use the model directory
+
+transform_method: "resize" # Transformation method for the concept bottleneck model ("original","resized","center")
+
+CUB_dataloader: # Paremeter for the CUB dataloader
+  CUB_dir: data/CUB_200_2011 # Path to the CUB dataset directory
+  split_file: data/CUB_processed/train_test_val.pkl # Path to the split file
+
+  #Concept (attributes) settings
+  return_concepts: False # Whether to return concept labels
+  return_visibility: False # Whether to return visibility labels can not be used with majority voting if return_concepts is True the dataloader will return a tuple of (concept_labels, visibility_labels)
+
+  use_majority_voting: True # Whether to use majority voting for concepts labels
+  min_class_count: 10 # apply the filer that removes concepts present in less than min_class_count classes only relevant after majority voting if false use all 320 concepts
+
+CUB_mask: # If use is true make a data loader that makes a mask for what concept to be used. 
+  use: False
+  CUB_dir: data/CUB_200_2011 # Path to the CUB dataset directory
+  split_file: data/CUB_processed/train_test_val.pkl # Path to the split file
+
+  #Concept (attributes) settings
+  return_concepts: False # Whether to return concept labels
+  return_visibility: False # Whether to return visibility labels can not be used with majority voting if return_concepts is True the dataloader will return a tuple of (concept_labels, visibility_labels)
+
+  use_majority_voting: True # Whether to use majority voting for concepts labels
+  min_class_count: 10 # apply the filer that removes concepts present in less than min_class_count classes only relevant after majority voting if false use all 320 concepts
+
+

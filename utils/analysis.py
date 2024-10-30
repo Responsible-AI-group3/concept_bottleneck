@@ -34,6 +34,7 @@ class TrainingLogger:
         self.class_data = defaultdict(lambda: {'correct': 0, 'top5_correct': 0, 'total': 0})
         self.concept_data = defaultdict(lambda: {'true_positives': 0, 'true_negatives': 0, 'false_positives': 0, 'false_negatives': 0, 'total': 0})
         self.loss_data = defaultdict(list)
+        self.sailency_scores = ddict(list) #Dictionary to store the sailency scores of the model only use for testing
 
     def update_class_accuracy(self, mode: str, logits: torch.Tensor, correct_label: torch.Tensor):
         logits = logits.detach().cpu().numpy()
@@ -64,6 +65,10 @@ class TrainingLogger:
     def update_loss(self, mode: str, loss: float):
         """Update loss for the given mode"""
         self.loss_data[mode].append(loss.item())
+    
+    def update_sailency_scores(self, mode: str, scores: torch.Tensor):
+        """Update sailency scores for the given mode"""
+        self.sailency_scores[mode].append(scores.detach().cpu().numpy())
 
     def get_class_metrics(self, mode: str) -> Dict[str, float]:
         if self.class_data[mode]['total'] == 0:
@@ -98,6 +103,11 @@ class TrainingLogger:
         return {
             'avg_loss': sum(self.loss_data[mode]) / len(self.loss_data[mode])
         }
+    
+    def get_sailency_scores(self, mode: str) -> Dict[str, float]:
+        return {
+            'sailency_scores': self.sailency_scores[mode] / len(self.sailency_scores[mode])
+        }
 
     def get_all_metrics(self) -> Dict[str, Dict[str, Any]]:
         metrics = {}
@@ -110,6 +120,8 @@ class TrainingLogger:
                 mode_metrics['concept_metrics'] = self.get_concept_metrics(mode)
             if mode in self.loss_data:
                 mode_metrics['loss_metrics'] = self.get_loss_metrics(mode)
+            if mode in self.sailency_scores:
+                mode_metrics['sailency_scores'] = self.get_sailency_scores(mode)
             metrics[mode] = mode_metrics
         return metrics
 
@@ -148,10 +160,14 @@ class TrainingLogger:
                 formatted += "  Loss Metrics:\n"
                 for metric, value in mode_metrics['loss_metrics'].items():
                     formatted += f"    {metric.capitalize()}: {value:.4f}\n"
+            if 'sailency_scores' in mode_metrics:
+                formatted += "  Sailency Scores:\n"
+                for metric, value in mode_metrics['sailency_scores'].items():
+                    formatted += f"    {metric.capitalize()}: {value:.4f}\n"
             formatted += "\n"
         return formatted
 
-
+'''
 class Logger(object):
     """
     Log results to a file and flush() to view instant updates
@@ -255,3 +271,4 @@ def multiclass_metric(output, target):
     balanced_acc = balanced_accuracy_score(target, output)
     report = classification_report(target, output)
     return balanced_acc, report
+'''

@@ -20,6 +20,12 @@ I will activly maintain this code until December 2024. If you have any questions
 - Python 3.9 to 3.12 
 - pip (Python package installer)
 
+You can check your Python version by typing:
+
+   ```
+   python -V
+   ```
+
 
 
 
@@ -56,7 +62,7 @@ Once your virtual environment is activated, install the required packages:
 pip install -r requirements.txt
 ```
 
-If you wish to use a GPU get the command for installing CUDA on: https://pytorch.org/get-started/locally/
+If you wish to use a GPU get the command for installing torch for CUDA on: https://pytorch.org/get-started/locally/
 
 If you are usure of your CUDA version type
 ```
@@ -69,4 +75,3 @@ nvidia-smi
 
 
 ## Notable changes from original code.
-  
