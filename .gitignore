@@ -110,3 +110,5 @@ Thumbs.db
 #HPC output
 *.out
 *.err
+
+\data
