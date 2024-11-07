@@ -22,7 +22,7 @@ class CUB_dataset(Dataset):
     """
 
 
-    def __init__(self, mode, config_dict: dict,transform=None): 
+    def __init__(self, mode, config_dict: dict,transform=None, reduce = True): 
         """
         mode: str,
         config_dict: dict, dictionary containing all the necessary information for the dataset
@@ -57,10 +57,11 @@ class CUB_dataset(Dataset):
             concepts, visibility = self.load_concepts(config_dict['CUB_dir']) # Load the concepts and visibility labels
             train_labels = self.load_labels(config_dict['CUB_dir']) # Load the class labels
 
-            self.concepts, self.concept_mask = self.apply_filter(train_ids,config_dict["min_class_count"],concepts,train_labels,visibility) # Apply filter to the class attributes
+            self.concepts, self.concept_mask = self.apply_filter(train_ids,config_dict["min_class_count"],concepts,train_labels,visibility,reduce) # Apply filter to the class attributes
             self.visibility = None # Visibility is not relevant after majority voting
-
-            self.n_concepts = len(self.concept_mask) # Update the number of concepts based on the filter
+            if reduce:
+                self.n_concepts = len(self.concept_mask) # Update the number of concepts based on the filter
+            
         else:
             self.majority_voting = False
 
@@ -136,7 +137,7 @@ class CUB_dataset(Dataset):
         return concepts, visibility
 
 
-    def apply_filter(self,ids:list, min_class_count:int,concept:dict,labels:dict,visibility:dict):
+    def apply_filter(self,ids:list, min_class_count:int,concept:dict,labels:dict,visibility:dict, reduce=True):
         """
         Function to apply filter to the class attributes based on the majority voting to match the original code
         arguments:
@@ -175,8 +176,15 @@ class CUB_dataset(Dataset):
             mask = np.where(class_count >= min_class_count)[0] #select attributes that are present (on a class level) in at least [min_class_count] classes
         else:
             mask = np.arange(312)
-        
-        return class_max_label[:,mask], mask
+
+
+        if reduce:
+            return class_max_label[:,mask], mask
+        else:
+            print(class_max_label.sum())
+            class_max_label[:,mask] = 0
+            print(class_max_label.sum())
+            return class_max_label, mask
 
     def calculate_imbalance(self):
         """
@@ -327,14 +335,14 @@ class CUB_extnded_dataset(CUB_dataset):
     A cup dataset that would return coordinates on concepts
     """
 
-    def __init__(self,mode:str, config_dict: dict,transform=None,crop_size:int =299):
+    def __init__(self,mode:str, config_dict: dict,transform=None,crop_size:int =299, reduce = True):
         """
         config_dict: dict, dictionary containing all the necessary information for the dataset
         transform: torchvision.transforms, transform to be applied to the image
         """
 
         self.crop_size = crop_size
-        super().__init__(mode,config_dict,transform)
+        super().__init__(mode,config_dict,transform,reduce)
 
                 #Read the file with the names of bird location attributes
         self.part_names = []
