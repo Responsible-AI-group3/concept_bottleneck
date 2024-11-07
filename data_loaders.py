@@ -57,20 +57,21 @@ class CUB_dataset(Dataset):
             concepts, visibility = self.load_concepts(config_dict['CUB_dir']) # Load the concepts and visibility labels
             train_labels = self.load_labels(config_dict['CUB_dir']) # Load the class labels
 
-            self.concepts, self.concept_mask = self.apply_filter(train_ids,config_dict["min_class_count"],concepts,train_labels,visibility,reduce) # Apply filter to the class attributes
+            self.concepts_MV , self.concept_mask = self.apply_filter(train_ids,config_dict["min_class_count"],concepts,train_labels,visibility,reduce) # Apply filter to the class attributes
             self.visibility = None # Visibility is not relevant after majority voting
             if reduce:
                 self.n_concepts = len(self.concept_mask) # Update the number of concepts based on the filter
             
         else:
             self.majority_voting = False
+        
 
-            if config_dict['return_visibility']:
-                self.concepts, self.visibility = self.load_concepts(config_dict['CUB_dir'])
-            else:
-                self.concepts, _ = self.load_concepts(config_dict['CUB_dir'])
-            
-                self.visibility = None
+        if config_dict['return_visibility']:
+            self.concepts, self.visibility = self.load_concepts(config_dict['CUB_dir'])
+        else:
+            self.concepts, _ = self.load_concepts(config_dict['CUB_dir'])
+        
+            self.visibility = None
 
         
         self.labels = self.load_labels(config_dict['CUB_dir']) # Load the class labels
@@ -247,7 +248,11 @@ class CUB_dataset(Dataset):
         Y = self.labels[img_id]
 
         if self.majority_voting:
-            C = self.concepts[Y] # If majority voting is applied the concepts are based on the class label
+            if self.mode == 'train':
+                C = self.concepts_MV[Y] # If majority voting is applied the concepts are based on the class label
+            else:
+                C = self.concepts[img_id]
+                C = C[self.concept_mask] # remove extra concepts
         else:
             #Make C a tuple if visibility is not None
             if self.visibility is not None:
