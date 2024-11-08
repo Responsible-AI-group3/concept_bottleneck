@@ -31,6 +31,8 @@ class CUB_dataset(Dataset):
         self.n_classes = 200 # Number of classes in the dataset
         self.n_concepts = 312
         self.transform = transform
+        self.mode = mode
+        self.reduce = reduce
 
         self.image_dir = os.path.join(config_dict['CUB_dir'],'images') # 
 
@@ -72,6 +74,7 @@ class CUB_dataset(Dataset):
             self.concepts, _ = self.load_concepts(config_dict['CUB_dir'])
         
             self.visibility = None
+            
 
         
         self.labels = self.load_labels(config_dict['CUB_dir']) # Load the class labels
@@ -182,9 +185,7 @@ class CUB_dataset(Dataset):
         if reduce:
             return class_max_label[:,mask], mask
         else:
-            print(class_max_label.sum())
             class_max_label[:,mask] = 0
-            print(class_max_label.sum())
             return class_max_label, mask
 
     def calculate_imbalance(self):
@@ -251,8 +252,9 @@ class CUB_dataset(Dataset):
             if self.mode == 'train':
                 C = self.concepts_MV[Y] # If majority voting is applied the concepts are based on the class label
             else:
-                C = self.concepts[img_id]
-                C = C[self.concept_mask] # remove extra concepts
+                C = np.array(self.concepts[img_id])
+                if self.reduce:
+                    C = C[self.concept_mask] # remove extra concepts
         else:
             #Make C a tuple if visibility is not None
             if self.visibility is not None:
@@ -368,7 +370,7 @@ class CUB_extnded_dataset(CUB_dataset):
         self.class_labels_names = pd.read_csv(os.path.join(config_dict['CUB_dir'],"classes.txt"), sep=" ", header=None)[1].values
 
         #If a filter was applied load the filter names.
-        if self.majority_voting:
+        if self.majority_voting and reduce:
             self.consept_labels_names= self.consept_labels_names[self.concept_mask]
 
 
@@ -442,8 +444,12 @@ class CUB_extnded_dataset(CUB_dataset):
         Y = self.labels[img_id]
 
         if self.majority_voting:
-            C = self.concepts[Y] # If majority voting is applied the concepts are based on the class label
-
+            if self.mode == 'train':
+                C = self.concepts_MV[Y] # If majority voting is applied the concepts are based on the class label
+            else:
+                C = np.array(self.concepts[img_id])
+                if self.reduce:
+                    C = C[self.concept_mask] # remove extra concepts
 
         else:
             #Make C a tuple if visibility is not None
