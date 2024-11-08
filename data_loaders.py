@@ -22,7 +22,7 @@ class CUB_dataset(Dataset):
     """
 
 
-    def __init__(self, mode, config_dict: dict,transform=None, reduce = True): 
+    def __init__(self, mode, config_dict: dict,transform=None, reduce = True, andreas = False): 
         """
         mode: str,
         config_dict: dict, dictionary containing all the necessary information for the dataset
@@ -33,6 +33,7 @@ class CUB_dataset(Dataset):
         self.transform = transform
         self.mode = mode
         self.reduce = reduce
+        self.andreas = andreas
 
         self.image_dir = os.path.join(config_dict['CUB_dir'],'images') # 
 
@@ -342,14 +343,14 @@ class CUB_extnded_dataset(CUB_dataset):
     A cup dataset that would return coordinates on concepts
     """
 
-    def __init__(self,mode:str, config_dict: dict,transform=None,crop_size:int =299, reduce = True):
+    def __init__(self,mode:str, config_dict: dict,transform=None,crop_size:int =299, reduce = True, andreas = False):
         """
         config_dict: dict, dictionary containing all the necessary information for the dataset
         transform: torchvision.transforms, transform to be applied to the image
         """
 
         self.crop_size = crop_size
-        super().__init__(mode,config_dict,transform,reduce)
+        super().__init__(mode,config_dict,transform,reduce,andreas)
 
                 #Read the file with the names of bird location attributes
         self.part_names = []
@@ -444,7 +445,7 @@ class CUB_extnded_dataset(CUB_dataset):
         Y = self.labels[img_id]
 
         if self.majority_voting:
-            if self.mode == 'train':
+            if self.mode == 'train' or self.andreas:
                 C = self.concepts_MV[Y] # If majority voting is applied the concepts are based on the class label
             else:
                 C = np.array(self.concepts[img_id])
